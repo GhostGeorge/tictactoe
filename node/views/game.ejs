@@ -8,6 +8,7 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
+      background-color: #f5f5f5;
     }
     
     #board {
@@ -17,6 +18,8 @@
       margin: 20px auto;
       width: 304px;
       background: #333;
+      border-radius: 8px;
+      padding: 2px;
     }
     
     .cell {
@@ -30,21 +33,38 @@
       font-weight: bold;
       cursor: pointer;
       user-select: none;
+      border-radius: 4px;
+      transition: background-color 0.2s;
     }
     
-    .cell:hover {
+    .cell:hover:not(.taken) {
       background: #f0f0f0;
+    }
+    
+    .cell.taken {
+      cursor: not-allowed;
+      background: #f8f9fa;
+    }
+    
+    .cell.winning {
+      background: #d4edda !important;
+      color: #155724;
     }
     
     #gameStatus {
       font-size: 1.5rem;
       margin: 20px 0;
       font-weight: bold;
+      min-height: 2rem;
     }
     
     #playerSymbol {
       font-size: 1.2rem;
       margin: 10px 0;
+      background: #e9ecef;
+      padding: 10px;
+      border-radius: 5px;
+      display: inline-block;
     }
     
     #turnIndicator {
@@ -57,43 +77,138 @@
       display: flex;
       justify-content: space-around;
       margin: 20px 0;
-      font-size: 1.1rem;
+      font-size: 1rem;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .timer {
-      padding: 10px 15px;
+      padding: 15px;
       border: 2px solid #ccc;
-      border-radius: 5px;
-      min-width: 100px;
+      border-radius: 8px;
+      min-width: 120px;
+      background: white;
+      transition: all 0.3s ease;
     }
 
     .timer.active {
       border-color: #007bff;
       background-color: #e7f3ff;
+      transform: scale(1.05);
     }
 
     .timer.warning {
-      border-color: #ff6b6b;
-      background-color: #ffe6e6;
-      color: #d63384;
+      border-color: #dc3545;
+      background-color: #f8d7da;
+      color: #721c24;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    .timer-label {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .timer-value {
+      font-size: 1.2rem;
+      font-family: monospace;
+    }
+
+    .connection-status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+
+    .connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .game-info {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px auto;
+      max-width: 500px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .opponent-status {
+      margin: 10px 0;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .opponent-connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .opponent-disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 5px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
     }
   </style>
 </head>
 <body>
+  <div class="connection-status" id="connectionStatus">Connecting...</div>
+  
   <h1>Tic Tac Toe</h1>
   
-  <div id="gameStatus">Connecting to game...</div>
-  <div id="playerSymbol">Waiting for symbol assignment...</div>
-  <div id="turnIndicator">Waiting for game to start...</div>
+  <div class="game-info">
+    <div id="gameStatus">Connecting to game...</div>
+    <div id="playerSymbol">Waiting for symbol assignment...</div>
+    <div id="turnIndicator">Waiting for game to start...</div>
+    <div id="opponentStatus" class="opponent-status" style="display: none;"></div>
+  </div>
   
   <div class="timer-container">
     <div class="timer" id="playerXTimer">
-      <div>Player X</div>
-      <div id="xTimeRemaining">1:00</div>
+      <div class="timer-label">Player X</div>
+      <div class="timer-value" id="xTimeRemaining">1:00</div>
     </div>
     <div class="timer" id="playerOTimer">
-      <div>Player O</div>
-      <div id="oTimeRemaining">1:00</div>
+      <div class="timer-label">Player O</div>
+      <div class="timer-value" id="oTimeRemaining">1:00</div>
     </div>
   </div>
   
@@ -109,6 +224,11 @@
     <div class="cell" data-index="8"></div>
   </div>
 
+  <div style="margin-top: 20px;">
+    <button onclick="window.location.href='/home'">Return Home</button>
+    <button onclick="location.reload()">Refresh Game</button>
+  </div>
+
   <script id="server-data" type="application/json">
     <%- JSON.stringify({ gameId, playerId, guest }) %>
   </script>
@@ -117,102 +237,268 @@
   <script>
     const socket = io();
 
-    // Parse server data from injected JSON
+    // Parse server data
     const serverData = JSON.parse(document.getElementById('server-data').textContent);
-    const { gameId, playerId: sessionPlayerId, guest: isGuest } = serverData;
+    const { gameId, playerId, guest: isGuest } = serverData;
 
-    // Use the game player ID if available, otherwise fall back to session player ID
-    const gamePlayerId = sessionStorage.getItem('gamePlayerId') || sessionPlayerId;
-    console.log('Using playerId for game:', gamePlayerId, '(session playerId was:', sessionPlayerId, ')');
-
+    // Game state
     let playerSymbol = null;
+    let playerIndex = null;
+    let currentTurn = null;
+    let gameActive = true;
+    let timerInterval = null;
+    let opponentConnected = true;
 
+    // DOM elements
     const boardEl = document.getElementById("board");
     const turnEl = document.getElementById("turnIndicator");
     const symbolEl = document.getElementById("playerSymbol");
     const gameStatusEl = document.getElementById("gameStatus");
+    const connectionStatusEl = document.getElementById("connectionStatus");
+    const opponentStatusEl = document.getElementById("opponentStatus");
+    const xTimerEl = document.getElementById("xTimeRemaining");
+    const oTimerEl = document.getElementById("oTimeRemaining");
+    const xTimerContainer = document.getElementById("playerXTimer");
+    const oTimerContainer = document.getElementById("playerOTimer");
 
-    console.log('Game page loaded. GameID:', gameId, 'PlayerID:', gamePlayerId, 'Guest:', isGuest);
+    console.log('Game page loaded. GameID:', gameId, 'PlayerID:', playerId, 'Guest:', isGuest);
 
-    // Don't join queue again - we're already in a game
-    // Instead, just wait for the match found event or request current game state
-    
-    // When a match is found, you receive the gameId and your symbol
-    socket.on('matchFound', ({ gameId: matchedGameId, symbol }) => {
-      if (matchedGameId === gameId) {
-        playerSymbol = symbol;
-        symbolEl.textContent = `You are ${symbol}`;
-        gameStatusEl.textContent = "Game started!";
-        console.log('Match found! You are:', symbol);
+    // Format time display
+    function formatTime(milliseconds) {
+      const seconds = Math.ceil(milliseconds / 1000);
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Update timer display
+    function updateTimerDisplay(timers, currentPlayerTimer, turnStartTime) {
+      if (!timers || !gameActive) return;
+
+      // Clear existing timer interval
+      if (timerInterval) {
+        clearInterval(timerInterval);
       }
-    });
 
-    // Update board state and turn info
-    socket.on('boardUpdate', ({ board, turn }) => {
-      console.log('Board update:', board, 'Turn:', turn);
+      // Update static timers
+      const playerXId = Object.keys(timers)[0];
+      const playerOId = Object.keys(timers)[1];
+      
+      xTimerEl.textContent = formatTime(timers[playerXId] || 60000);
+      oTimerEl.textContent = formatTime(timers[playerOId] || 60000);
+
+      // Highlight active player's timer
+      xTimerContainer.classList.toggle('active', currentTurn === 'X');
+      oTimerContainer.classList.toggle('active', currentTurn === 'O');
+
+      // Start countdown for current player if we have the data
+      if (currentPlayerTimer !== null && currentTurn && turnStartTime) {
+        let remainingTime = currentPlayerTimer;
+        const startTime = Date.now();
+        
+        timerInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const currentRemaining = Math.max(0, remainingTime - elapsed);
+          
+          if (currentTurn === 'X') {
+            xTimerEl.textContent = formatTime(currentRemaining);
+            xTimerContainer.classList.toggle('warning', currentRemaining < 10000);
+          } else if (currentTurn === 'O') {
+            oTimerEl.textContent = formatTime(currentRemaining);
+            oTimerContainer.classList.toggle('warning', currentRemaining < 10000);
+          }
+          
+          if (currentRemaining <= 0) {
+            clearInterval(timerInterval);
+          }
+        }, 100);
+      }
+    }
+
+    // Update board display
+    function updateBoard(board) {
       [...boardEl.children].forEach((cell, idx) => {
-        cell.textContent = board[idx] || "";
+        const value = board[idx];
+        cell.textContent = value || "";
+        cell.classList.toggle('taken', !!value);
+        
+        // Add color coding for X and O
+        cell.style.color = value === 'X' ? '#007bff' : value === 'O' ? '#dc3545' : '#000';
       });
+    }
 
-      if (playerSymbol) {
-        turnEl.textContent = turn === gamePlayerId ? "Your turn" : "Opponent's turn";
-      }
-    });
-
-    // Game over event
-    socket.on('gameOver', ({ winner }) => {
-      console.log('Game over:', winner);
-      if (winner === 'draw') {
-        gameStatusEl.textContent = "It's a draw!";
-      } else if (winner === gamePlayerId) {
-        gameStatusEl.textContent = "You win! 🎉";
+    // Update turn indicator
+    function updateTurnIndicator() {
+      if (!gameActive) return;
+      
+      if (currentTurn === playerSymbol) {
+        turnEl.textContent = "Your turn";
+        turnEl.style.color = "#007bff";
+        turnEl.style.fontWeight = "bold";
+      } else if (currentTurn) {
+        turnEl.textContent = opponentConnected ? "Opponent's turn" : "Waiting for opponent...";
+        turnEl.style.color = "#666";
+        turnEl.style.fontWeight = "normal";
       } else {
-        gameStatusEl.textContent = "You lost 😢";
+        turnEl.textContent = "Waiting for game to start...";
+        turnEl.style.color = "#666";
+        turnEl.style.fontWeight = "normal";
       }
-    });
+    }
 
-    // Opponent disconnected
-    socket.on('opponentDisconnected', () => {
-      gameStatusEl.textContent = "Opponent disconnected. You win!";
-    });
-
-    // Error messages from server
-    socket.on('errorMessage', (msg) => {
-      console.error('Error:', msg);
-      alert(`Error: ${msg}`);
-    });
-
-    socket.on('queueError', ({ message }) => {
-      console.error('Queue error:', message);
-      alert(`Queue error: ${message}`);
-    });
-
-    socket.on('queueUpdate', ({ position }) => {
-      gameStatusEl.textContent = `Waiting in queue... position: ${position}`;
-    });
-
-    // Click handler to make a move
-    boardEl.addEventListener('click', (e) => {
-      if (e.target.dataset.index !== undefined && playerSymbol) {
-        const index = parseInt(e.target.dataset.index);
-        console.log('Making move at index:', index);
-        socket.emit('makeMove', { gameId, index });
-      }
-    });
-
-    // Request current game state when we connect
+    // Socket event handlers
     socket.on('connect', () => {
       console.log('Connected to server');
+      connectionStatusEl.textContent = 'Connected';
+      connectionStatusEl.className = 'connection-status connected';
       gameStatusEl.textContent = "Connected! Joining game...";
       
-      // Join the existing game with our player ID
-      console.log('Joining game:', gameId, 'as player:', gamePlayerId);
-      socket.emit('joinGame', { gameId, playerId: gamePlayerId });
+      socket.emit('joinGame', { gameId, playerId });
     });
 
     socket.on('disconnect', () => {
       console.log('Disconnected from server');
-      gameStatusEl.textContent = 'Disconnected from server.';
+      connectionStatusEl.textContent = 'Disconnected';
+      connectionStatusEl.className = 'connection-status disconnected';
+      gameStatusEl.textContent = 'Disconnected from server. Trying to reconnect...';
+      if (timerInterval) clearInterval(timerInterval);
+    });
+
+    socket.on('matchFound', ({ gameId: matchedGameId, symbol, playerId: gamePlayerId, playerIndex: pIndex }) => {
+      if (matchedGameId === gameId) {
+        playerSymbol = symbol;
+        playerIndex = pIndex;
+        symbolEl.textContent = `You are ${symbol}`;
+        gameStatusEl.textContent = "Game started!";
+        gameActive = true;
+        console.log('Match found! You are:', symbol, 'Player index:', playerIndex);
+      }
+    });
+
+    socket.on('boardUpdate', ({ board, turn, timers, currentPlayerTimer, turnStartTime }) => {
+      console.log('Board update:', { board, turn, timers, currentPlayerTimer });
+      
+      updateBoard(board);
+      currentTurn = turn;
+      updateTurnIndicator();
+      
+      if (timers) {
+        updateTimerDisplay(timers, currentPlayerTimer, turnStartTime);
+      }
+    });
+
+    socket.on('gameOver', ({ winner, reason }) => {
+      console.log('Game over:', winner, 'Reason:', reason);
+      gameActive = false;
+      
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+      
+      // Clear timer highlighting
+      xTimerContainer.classList.remove('active', 'warning');
+      oTimerContainer.classList.remove('active', 'warning');
+      
+      let message = '';
+      if (winner === 'draw') {
+        message = "It's a draw! 🤝";
+        gameStatusEl.style.color = "#6c757d";
+      } else if (winner === playerSymbol) {
+        message = "You win! 🎉";
+        gameStatusEl.style.color = "#28a745";
+      } else {
+        message = "You lose 😢";
+        gameStatusEl.style.color = "#dc3545";
+      }
+      
+      if (reason === 'timeout') {
+        message += " (Time ran out)";
+      }
+      
+      gameStatusEl.textContent = message;
+      turnEl.textContent = "Game finished";
+    });
+
+    socket.on('opponentDisconnected', () => {
+      console.log('Opponent disconnected');
+      opponentConnected = false;
+      opponentStatusEl.textContent = "Opponent disconnected - their timer will run down";
+      opponentStatusEl.className = "opponent-status opponent-disconnected";
+      opponentStatusEl.style.display = "block";
+      updateTurnIndicator();
+    });
+
+    socket.on('opponentReconnected', () => {
+      console.log('Opponent reconnected');
+      opponentConnected = true;
+      opponentStatusEl.textContent = "Opponent reconnected";
+      opponentStatusEl.className = "opponent-status opponent-connected";
+      setTimeout(() => {
+        opponentStatusEl.style.display = "none";
+      }, 3000);
+      updateTurnIndicator();
+    });
+
+    socket.on('errorMessage', (msg) => {
+      console.error('Error:', msg);
+      gameStatusEl.textContent = `Error: ${msg}`;
+      gameStatusEl.style.color = "#dc3545";
+    });
+
+    socket.on('queueError', ({ message }) => {
+      console.error('Queue error:', message);
+      gameStatusEl.textContent = `Queue error: ${message}`;
+      gameStatusEl.style.color = "#dc3545";
+    });
+
+    // Click handler for moves
+    boardEl.addEventListener('click', (e) => {
+      if (!gameActive || currentTurn !== playerSymbol) return;
+      
+      const cell = e.target;
+      if (!cell.classList.contains('cell') || cell.classList.contains('taken')) return;
+      
+      const index = parseInt(cell.dataset.index);
+      if (isNaN(index)) return;
+      
+      console.log('Making move at index:', index);
+      socket.emit('makeMove', { gameId, index });
+      
+      // Provide immediate feedback
+      cell.style.background = '#e9ecef';
+      setTimeout(() => {
+        if (!cell.classList.contains('taken')) {
+          cell.style.background = 'white';
+        }
+      }, 200);
+    });
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      if (!gameActive || currentTurn !== playerSymbol) return;
+      
+      const key = e.key;
+      let index = -1;
+      
+      if (key >= '1' && key <= '9') {
+        index = parseInt(key) - 1;
+      } else if (key >= '0' && key <= '8') {
+        index = parseInt(key);
+      }
+      
+      if (index >= 0 && index <= 8) {
+        const cell = boardEl.children[index];
+        if (cell && !cell.classList.contains('taken')) {
+          cell.click();
+        }
+      }
+    });
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
     });
   </script>
 </body>

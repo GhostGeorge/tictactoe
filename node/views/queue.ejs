@@ -3,11 +3,161 @@
 <head>
   <meta charset="UTF-8" />
   <title>Queue - Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    .queue-container {
+      max-width: 500px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    
+    .player-info {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      font-family: monospace;
+    }
+    
+    #status {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 5px;
+      min-height: 1.5rem;
+    }
+    
+    .status-connecting {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    
+    .status-waiting {
+      background: #cce5ff;
+      color: #004085;
+      border: 1px solid #b3d9ff;
+    }
+    
+    .status-found {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .status-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 5px;
+      transition: background-color 0.2s;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    
+    .queue-info {
+      color: #666;
+      font-size: 0.9rem;
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+
+    .connection-status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+
+    .connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+  </style>
 </head>
 <body>
-  <h1>Matchmaking Queue</h1>
-  <p>Your player ID: <%= playerId %></p>
-  <p>Status: <span id="status">Connecting...</span></p>
+  <div class="connection-status" id="connectionStatus">Connecting...</div>
+  
+  <div class="queue-container">
+    <h1>Matchmaking Queue</h1>
+    
+    <div class="player-info">
+      <strong>Player ID:</strong> <%= playerId %><br>
+      <strong>Type:</strong> <%= guest ? 'Guest' : 'Google Account' %>
+    </div>
+    
+    <div id="status" class="status-connecting">
+      <span class="loading-spinner"></span>
+      Connecting to server...
+    </div>
+    
+    <div class="queue-info">
+      <p>🎮 Waiting for another player to join the queue</p>
+      <p>⚡ Games are fast-paced with 1-minute timers per player</p>
+      <p>🏆 First to get 3 in a row wins!</p>
+    </div>
+    
+    <div style="margin-top: 30px;">
+      <button onclick="window.location.href='/home'">Cancel & Return Home</button>
+      <button onclick="location.reload()" id="reconnectBtn" style="display: none;">Reconnect</button>
+    </div>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
 
@@ -18,37 +168,111 @@
   <script>
     // Parse server data safely from the script tag
     const serverData = JSON.parse(document.getElementById('server-data').textContent);
-    const playerId = serverData.playerId;
-    const isGuest = serverData.guest;
+    const { playerId, guest: isGuest } = serverData;
 
     const socket = io();
-
     const statusEl = document.getElementById('status');
+    const connectionStatusEl = document.getElementById('connectionStatus');
+    const reconnectBtn = document.getElementById('reconnectBtn');
+
+    let isConnected = false;
+    let hasJoinedQueue = false;
+
+    console.log('Queue page loaded. PlayerID:', playerId, 'Guest:', isGuest);
+
+    function updateStatus(message, className = 'status-connecting', showSpinner = false) {
+      statusEl.className = `status-${className}`;
+      statusEl.innerHTML = showSpinner ? 
+        `<span class="loading-spinner"></span>${message}` : 
+        message;
+    }
+
+    function updateConnectionStatus(connected) {
+      isConnected = connected;
+      connectionStatusEl.textContent = connected ? 'Connected' : 'Disconnected';
+      connectionStatusEl.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
+      reconnectBtn.style.display = connected ? 'none' : 'inline-block';
+    }
 
     socket.on('connect', () => {
-      statusEl.textContent = 'Connected to server, joining queue...';
+      console.log('Connected to server');
+      updateConnectionStatus(true);
+      updateStatus('Connected! Joining queue...', 'connecting', true);
 
-      socket.emit('joinQueue', { playerId, isGuest });
-    });
-
-    socket.on('queueUpdate', ({ position }) => {
-      statusEl.textContent = `Waiting in queue... position: ${position}`;
-    });
-
-    socket.on('queueError', ({ message }) => {
-      statusEl.textContent = `Queue error: ${message}`;
-    });
-
-    socket.on('matchFound', ({ gameId, symbol, playerId: gamePlayerId }) => {
-      statusEl.textContent = `Match found! Redirecting to game...`;
-      console.log('Match found! GameId:', gameId, 'Symbol:', symbol, 'Game PlayerId:', gamePlayerId);
-
-      // Redirect to game page with the actual player ID as a query parameter
-      window.location.href = `/game/${gameId}?playerId=${encodeURIComponent(gamePlayerId || playerId)}`;
+      // Small delay to ensure connection is stable
+      setTimeout(() => {
+        console.log('Emitting joinQueue with:', { playerId, isGuest });
+        socket.emit('joinQueue', { playerId, isGuest });
+        hasJoinedQueue = true;
+      }, 100);
     });
 
     socket.on('disconnect', () => {
-      statusEl.textContent = 'Disconnected from server.';
+      console.log('Disconnected from server');
+      updateConnectionStatus(false);
+      updateStatus('Disconnected from server. Trying to reconnect...', 'error');
+      hasJoinedQueue = false;
+    });
+
+    socket.on('queueUpdate', ({ position }) => {
+      console.log('Queue position update:', position);
+      updateStatus(
+        `In queue - Position: ${position}<br><small>Waiting for an opponent...</small>`, 
+        'waiting', 
+        true
+      );
+    });
+
+    socket.on('queueError', ({ message }) => {
+      console.error('Queue error:', message);
+      updateStatus(`Queue Error: ${message}`, 'error');
+      
+      // Try to rejoin queue after a delay if it was a temporary error
+      if (message.includes('Already in queue') && isConnected) {
+        setTimeout(() => {
+          console.log('Retrying queue join...');
+          socket.emit('joinQueue', { playerId, isGuest });
+        }, 2000);
+      }
+    });
+
+    socket.on('matchFound', ({ gameId, symbol, playerId: gamePlayerId }) => {
+      console.log('Match found!', { gameId, symbol, gamePlayerId });
+      updateStatus(
+        `Match found! You are ${symbol}<br><small>Redirecting to game...</small>`, 
+        'found'
+      );
+
+      // Redirect to game page with the correct player ID
+      setTimeout(() => {
+        const redirectPlayerId = gamePlayerId || playerId;
+        console.log('Redirecting to game with playerId:', redirectPlayerId);
+        window.location.href = `/game/${gameId}?playerId=${encodeURIComponent(redirectPlayerId)}`;
+      }, 1500);
+    });
+
+    // Handle page visibility changes to rejoin queue if needed
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && isConnected && !hasJoinedQueue) {
+        console.log('Page became visible, rejoining queue...');
+        setTimeout(() => {
+          socket.emit('joinQueue', { playerId, isGuest });
+          hasJoinedQueue = true;
+        }, 500);
+      }
+    });
+
+    // Reconnect button handler
+    reconnectBtn.addEventListener('click', () => {
+      location.reload();
+    });
+
+    // Prevent accidental page navigation
+    window.addEventListener('beforeunload', (e) => {
+      if (hasJoinedQueue && isConnected) {
+        e.preventDefault();
+        e.returnValue = 'You are currently in the matchmaking queue. Are you sure you want to leave?';
+      }
     });
   </script>
 </body>

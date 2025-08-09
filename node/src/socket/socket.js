@@ -10,6 +10,9 @@ const {
 const isDev = process.env.NODE_ENV === 'development';
 
 module.exports = function(io) {
+  // Store socket-to-player mappings for better tracking
+  const socketPlayerMap = new Map(); // socketId -> { playerId, gameId }
+  
   io.on('connection', (socket) => {
     console.log(`🔌 New client connected: ${socket.id}`);
 
@@ -35,24 +38,26 @@ module.exports = function(io) {
         const { gameId, players } = result;
         console.log(`🎯 Match found! ${players[0].playerId} vs ${players[1].playerId} -> ${gameId}`);
 
+        // Store socket mappings
+        players.forEach((player) => {
+          socketPlayerMap.set(player.socketId, { playerId: player.playerId, gameId });
+        });
+
         players.forEach((player, idx) => {
           const symbol = idx === 0 ? 'X' : 'O';
           console.log(`Sending matchFound to ${player.socketId}: symbol=${symbol}, gameId=${gameId}, playerId=${player.playerId}`);
           
-          // Send match found with the actual playerId that will be used in the game
           io.to(player.socketId).emit('matchFound', { 
             gameId, 
             symbol, 
-            playerId: player.playerId // Include the actual playerId used in the game
+            playerId: player.playerId,
+            playerIndex: idx
           });
           
-          // Also send initial board state
+          // Send initial board state with proper symbols
           const game = getGame(gameId);
           if (game) {
-            io.to(player.socketId).emit('boardUpdate', { 
-              board: game.state.board, 
-              turn: game.state.turn 
-            });
+            sendBoardUpdate(game, player.socketId);
           }
         });
       } else {
@@ -60,79 +65,64 @@ module.exports = function(io) {
       }
     });
 
-    // Handle player joining an existing game (for reconnection)
     socket.on('joinGame', ({ gameId, playerId }) => {
       console.log(`🎮 Player ${playerId} trying to join game ${gameId} with socket ${socket.id}`);
       
       const game = getGame(gameId);
       if (!game) {
-        console.log(`❌ Game ${gameId} not found. Available games:`, Array.from(getAllGames().keys()));
+        console.log(`❌ Game ${gameId} not found`);
         io.to(socket.id).emit('errorMessage', 'Game not found');
         return;
       }
 
-      console.log(`✅ Game found. Players in game:`, game.players.map(p => ({ playerId: p.playerId, socketId: p.socketId, disconnected: p.disconnected })));
-
-      // Find the player in the game and update their socket ID
       const playerIndex = game.players.findIndex(p => p.playerId === playerId);
-      
       if (playerIndex === -1) {
-        console.log(`❌ Player ${playerId} not found in game ${gameId}. Valid players:`, game.players.map(p => p.playerId));
+        console.log(`❌ Player ${playerId} not found in game ${gameId}`);
         io.to(socket.id).emit('errorMessage', 'You are not in this game');
         return;
       }
 
-      // Update the player's socket ID and mark as reconnected
+      // Update socket mapping and player connection status
       const oldSocketId = game.players[playerIndex].socketId;
       game.players[playerIndex].socketId = socket.id;
       game.players[playerIndex].disconnected = false;
       delete game.players[playerIndex].disconnectedAt;
+      
+      socketPlayerMap.set(socket.id, { playerId, gameId });
+      
       console.log(`🔄 Updated socket ID for player ${playerId}: ${oldSocketId} → ${socket.id}`);
 
-      // Initialize or update timers
+      // Initialize timers if not already done
       if (!game.timers) {
-        game.timers = {};
-        game.players.forEach(p => {
-          game.timers[p.playerId] = 60000; // 1 minute per player
-        });
-        game.turnStartTime = Date.now();
+        initializeTimers(game);
       }
 
-      // Send current game state
       const symbol = playerIndex === 0 ? 'X' : 'O';
+      console.log(`📡 Sending game state to ${socket.id}: symbol=${symbol}`);
       
-      // Calculate remaining time for current player
-      const currentTime = Date.now();
-      const elapsedTime = currentTime - (game.turnStartTime || currentTime);
-      const currentPlayerTimer = Math.max(0, game.timers[game.state.turn] - elapsedTime);
-      
-      console.log(`📡 Sending game state to ${socket.id}: symbol=${symbol}, turn=${game.state.turn}, timer=${currentPlayerTimer}`);
-      
-      io.to(socket.id).emit('matchFound', { gameId, symbol });
-      io.to(socket.id).emit('boardUpdate', { 
-        board: game.state.board, 
-        turn: game.state.turn,
-        timers: game.timers,
-        currentPlayerTimer: currentPlayerTimer
+      io.to(socket.id).emit('matchFound', { 
+        gameId, 
+        symbol, 
+        playerId,
+        playerIndex
       });
+      
+      sendBoardUpdate(game, socket.id);
 
-      // Notify opponent that player reconnected
+      // Notify opponent of reconnection
       const opponent = game.players.find(p => p.playerId !== playerId && !p.disconnected);
       if (opponent) {
         io.to(opponent.socketId).emit('opponentReconnected');
       }
 
+      // Handle finished games
       if (game.state.status !== 'playing') {
+        const winner = convertPlayerIdToSymbol(game, game.state.winner);
         io.to(socket.id).emit('gameOver', {
-          winner: game.state.winner || 'draw',
+          winner: winner || 'draw',
+          reason: 'game_complete'
         });
       }
-    });
-
-    // Handle requests for current game state (legacy support)
-    socket.on('getGameState', ({ gameId }) => {
-      console.log(`Legacy getGameState called for ${gameId} from ${socket.id}`);
-      io.to(socket.id).emit('errorMessage', 'Please refresh the page to reconnect');
     });
 
     socket.on('makeMove', ({ gameId, index }) => {
@@ -150,41 +140,19 @@ module.exports = function(io) {
         return;
       }
 
-      // Check if it's the player's turn
       if (game.state.turn !== player.playerId) {
         io.to(socket.id).emit('errorMessage', 'Not your turn');
         return;
       }
 
-      // Check timer
+      // Check and update timer
       if (game.timers) {
-        const currentTime = Date.now();
-        const elapsedTime = currentTime - game.turnStartTime;
-        const remainingTime = game.timers[player.playerId] - elapsedTime;
-        
-        if (remainingTime <= 0) {
-          // Player ran out of time
-          game.state.status = 'won';
-          const opponent = game.players.find(p => p.playerId !== player.playerId);
-          game.state.winner = opponent.playerId;
-          
-          game.players.forEach(p => {
-            if (!p.disconnected) {
-              io.to(p.socketId).emit('gameOver', {
-                winner: opponent.playerId,
-                reason: 'timeout'
-              });
-            }
-          });
-          removeGame(gameId);
+        const timeoutResult = updatePlayerTimer(game, player.playerId);
+        if (timeoutResult.timeout) {
+          handleGameTimeout(game, player.playerId);
           return;
         }
-        
-        // Update remaining time for current player
-        game.timers[player.playerId] = remainingTime;
       }
-
-      console.log(`Player making move: ${player.playerId}, current turn: ${game.state.turn}`);
 
       const moveResult = makeMove(gameId, player.playerId, index);
       if (!moveResult.ok) {
@@ -193,87 +161,166 @@ module.exports = function(io) {
         return;
       }
 
-      console.log(`Move successful! New board:`, game.state.board);
+      console.log(`Move successful! New turn: ${game.state.turn}`);
 
-      // Convert player IDs to symbols for display
-      const displayBoard = game.state.board.map(cell => {
-        if (!cell) return null;
-        const playerIndex = game.players.findIndex(p => p.playerId === cell);
-        return playerIndex === 0 ? 'X' : 'O';
-      });
-
-      // Reset timer for next player's turn
+      // Reset timer for next turn
       if (game.timers && !moveResult.finished) {
         game.turnStartTime = Date.now();
       }
 
-      // Send board update to both players with symbols instead of player IDs
+      // Send updates to all connected players
       game.players.forEach(p => {
         if (!p.disconnected) {
-          io.to(p.socketId).emit('boardUpdate', { 
-            board: displayBoard, // Show X/O instead of player IDs
-            turn: game.state.turn,
-            timers: game.timers,
-            turnStartTime: game.turnStartTime
-          });
+          sendBoardUpdate(game, p.socketId);
         }
       });
 
       if (moveResult.finished) {
-        console.log(`Game finished! Winner: ${moveResult.winner || 'draw'}`);
-        
-        let displayWinner = 'draw';
-        if (moveResult.winner) {
-          const winnerIndex = game.players.findIndex(p => p.playerId === moveResult.winner);
-          displayWinner = winnerIndex === 0 ? 'X' : 'O';
-        }
-        
-        game.players.forEach(p => {
-          if (!p.disconnected) {
-            io.to(p.socketId).emit('gameOver', {
-              winner: displayWinner,
-              reason: 'game_complete'
-            });
-          }
-        });
-        removeGame(gameId);
+        handleGameEnd(game, moveResult);
       }
     });
 
     socket.on('disconnect', () => {
       console.log(`❌ Client disconnected: ${socket.id}`);
-
-      removeFromQueueBySocket(socket.id);
-
-      // Mark the player as disconnected but don't remove the game immediately
-      const games = getAllGames();
-      for (const [gameId, game] of games.entries()) {
-        const player = game.players.find(p => p.socketId === socket.id);
-        if (player) {
-          console.log(`Player ${player.playerId} disconnected from game ${gameId} - marking as disconnected`);
-          
-          // Mark player as disconnected instead of removing game
-          player.disconnected = true;
-          player.disconnectedAt = Date.now();
-          
-          const opponent = game.players.find(p => p.socketId !== socket.id);
-          if (opponent && !opponent.disconnected) {
-            io.to(opponent.socketId).emit('opponentDisconnected');
-          }
-          
-          // Only remove game if both players are disconnected for 5 minutes
-          const bothDisconnected = game.players.every(p => p.disconnected);
-          if (bothDisconnected) {
+      
+      const mapping = socketPlayerMap.get(socket.id);
+      if (mapping) {
+        const { playerId, gameId } = mapping;
+        const game = getGame(gameId);
+        
+        if (game) {
+          const player = game.players.find(p => p.playerId === playerId);
+          if (player) {
+            console.log(`Player ${playerId} disconnected from game ${gameId}`);
+            player.disconnected = true;
+            player.disconnectedAt = Date.now();
+            
+            // Notify opponent
+            const opponent = game.players.find(p => p.playerId !== playerId && !p.disconnected);
+            if (opponent) {
+              io.to(opponent.socketId).emit('opponentDisconnected');
+            }
+            
+            // Clean up abandoned games after 5 minutes
             setTimeout(() => {
-              const currentGame = getGame(gameId);
-              if (currentGame && currentGame.players.every(p => p.disconnected)) {
-                console.log(`Removing abandoned game ${gameId} - both players disconnected`);
-                removeGame(gameId);
-              }
-            }, 300000); // 5 minutes
+              cleanupAbandonedGame(gameId);
+            }, 300000);
           }
         }
+        
+        socketPlayerMap.delete(socket.id);
       }
+
+      // Remove from queue if they were waiting
+      removeFromQueueBySocket(socket.id);
     });
+
+    // Helper functions
+    function initializeTimers(game) {
+      game.timers = {};
+      game.players.forEach(p => {
+        game.timers[p.playerId] = 60000; // 60 seconds
+      });
+      game.turnStartTime = Date.now();
+    }
+
+    function updatePlayerTimer(game, playerId) {
+      const currentTime = Date.now();
+      const elapsedTime = currentTime - (game.turnStartTime || currentTime);
+      const remainingTime = game.timers[playerId] - elapsedTime;
+      
+      if (remainingTime <= 0) {
+        return { timeout: true, remainingTime: 0 };
+      }
+      
+      game.timers[playerId] = remainingTime;
+      return { timeout: false, remainingTime };
+    }
+
+    function handleGameTimeout(game, timedOutPlayerId) {
+      console.log(`Player ${timedOutPlayerId} timed out`);
+      
+      game.state.status = 'won';
+      const opponent = game.players.find(p => p.playerId !== timedOutPlayerId);
+      game.state.winner = opponent.playerId;
+      
+      const winnerSymbol = convertPlayerIdToSymbol(game, opponent.playerId);
+      
+      game.players.forEach(p => {
+        if (!p.disconnected) {
+          io.to(p.socketId).emit('gameOver', {
+            winner: winnerSymbol,
+            reason: 'timeout'
+          });
+        }
+      });
+      
+      removeGame(game.id);
+    }
+
+    function handleGameEnd(game, moveResult) {
+      console.log(`Game finished! Winner: ${moveResult.winner || 'draw'}`);
+      
+      let displayWinner = 'draw';
+      if (moveResult.winner) {
+        displayWinner = convertPlayerIdToSymbol(game, moveResult.winner);
+      }
+      
+      game.players.forEach(p => {
+        if (!p.disconnected) {
+          io.to(p.socketId).emit('gameOver', {
+            winner: displayWinner,
+            reason: 'game_complete'
+          });
+        }
+      });
+      
+      removeGame(game.id);
+    }
+
+    function convertPlayerIdToSymbol(game, playerId) {
+      if (!playerId) return null;
+      const playerIndex = game.players.findIndex(p => p.playerId === playerId);
+      return playerIndex === 0 ? 'X' : 'O';
+    }
+
+    function convertBoardToSymbols(game) {
+      return game.state.board.map(cell => {
+        if (!cell) return null;
+        return convertPlayerIdToSymbol(game, cell);
+      });
+    }
+
+    function sendBoardUpdate(game, socketId) {
+      const displayBoard = convertBoardToSymbols(game);
+      const currentTurnSymbol = convertPlayerIdToSymbol(game, game.state.turn);
+      
+      // Calculate current timer state
+      let currentPlayerTimer = null;
+      if (game.timers && game.state.status === 'playing') {
+        const currentTime = Date.now();
+        const elapsedTime = currentTime - (game.turnStartTime || currentTime);
+        currentPlayerTimer = Math.max(0, game.timers[game.state.turn] - elapsedTime);
+      }
+      
+      io.to(socketId).emit('boardUpdate', {
+        board: displayBoard,
+        turn: currentTurnSymbol,
+        timers: game.timers ? {
+          [game.players[0].playerId]: game.timers[game.players[0].playerId],
+          [game.players[1].playerId]: game.timers[game.players[1].playerId]
+        } : null,
+        currentPlayerTimer,
+        turnStartTime: game.turnStartTime
+      });
+    }
+
+    function cleanupAbandonedGame(gameId) {
+      const game = getGame(gameId);
+      if (game && game.players.every(p => p.disconnected)) {
+        console.log(`Removing abandoned game ${gameId}`);
+        removeGame(gameId);
+      }
+    }
   });
 };

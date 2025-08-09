@@ -42,13 +42,24 @@ function createGame(gameId, p1, p2, password = null) {
     password: password || null,
     state: {
       board: Array(9).fill(null), // 0..8 cells
-      turn: p1.playerId, // p1 starts
+      turn: p1.playerId, // p1 starts (X player)
       status: 'playing', // 'playing', 'won', 'draw'
       winner: null
     },
+    timers: {
+      [p1.playerId]: 60000, // 60 seconds per player
+      [p2.playerId]: 60000
+    },
+    turnStartTime: Date.now(),
     createdAt: Date.now(),
     lastActivity: Date.now()
   };
+  
+  console.log(`Created game ${gameId} with players:`, {
+    player1: { id: p1.playerId, socket: p1.socketId },
+    player2: { id: p2.playerId, socket: p2.socketId }
+  });
+  
   return game;
 }
 
@@ -57,38 +68,68 @@ function getGame(gameId) {
 }
 
 function removeGame(gameId) {
+  console.log(`Removing game ${gameId}`);
   activeGames.delete(gameId);
 }
 
 function makeMove(gameId, playerId, cellIndex) {
   const game = getGame(gameId);
-  if (!game || game.state.status !== 'playing') return { ok: false, reason: 'invalid_game' };
+  if (!game) {
+    console.log(`makeMove: Game ${gameId} not found`);
+    return { ok: false, reason: 'invalid_game' };
+  }
 
-  if (game.state.turn !== playerId) return { ok: false, reason: 'not_your_turn' };
-  if (cellIndex < 0 || cellIndex > 8) return { ok: false, reason: 'invalid_cell' };
-  if (game.state.board[cellIndex] !== null) return { ok: false, reason: 'cell_taken' };
+  if (game.state.status !== 'playing') {
+    console.log(`makeMove: Game ${gameId} is not in playing state: ${game.state.status}`);
+    return { ok: false, reason: 'game_not_active' };
+  }
 
-  // mark move
+  if (game.state.turn !== playerId) {
+    console.log(`makeMove: Not player's turn. Expected: ${game.state.turn}, Got: ${playerId}`);
+    return { ok: false, reason: 'not_your_turn' };
+  }
+
+  if (cellIndex < 0 || cellIndex > 8) {
+    console.log(`makeMove: Invalid cell index: ${cellIndex}`);
+    return { ok: false, reason: 'invalid_cell' };
+  }
+
+  if (game.state.board[cellIndex] !== null) {
+    console.log(`makeMove: Cell ${cellIndex} is already taken: ${game.state.board[cellIndex]}`);
+    return { ok: false, reason: 'cell_taken' };
+  }
+
+  // Make the move
   game.state.board[cellIndex] = playerId;
   game.lastActivity = Date.now();
 
-  // check win/draw
+  console.log(`Move made by ${playerId} at position ${cellIndex}`);
+  console.log(`Board state:`, game.state.board);
+
+  // Check for winner
   const winner = checkWinner(game.state.board);
   if (winner) {
     game.state.status = 'won';
-    game.state.winner = playerId;
-    return { ok: true, finished: true, winner: playerId, game };
+    game.state.winner = winner;
+    console.log(`Game ${gameId} won by ${winner}`);
+    return { ok: true, finished: true, winner, game };
   }
 
-  // draw?
+  // Check for draw
   if (game.state.board.every(c => c !== null)) {
     game.state.status = 'draw';
+    console.log(`Game ${gameId} ended in draw`);
     return { ok: true, finished: true, draw: true, game };
   }
 
-  // switch turn
-  const other = game.players.find(p => p.playerId !== playerId);
-  game.state.turn = other.playerId;
+  // Switch turns
+  const currentPlayerIndex = game.players.findIndex(p => p.playerId === playerId);
+  const nextPlayerIndex = currentPlayerIndex === 0 ? 1 : 0;
+  const nextPlayer = game.players[nextPlayerIndex];
+  
+  game.state.turn = nextPlayer.playerId;
+  console.log(`Turn switched from ${playerId} to ${nextPlayer.playerId}`);
+
   return { ok: true, finished: false, game };
 }
 
@@ -98,16 +139,58 @@ function checkWinner(board) {
     [0,3,6],[1,4,7],[2,5,8], // cols
     [0,4,8],[2,4,6]          // diagonals
   ];
+  
   for (const [a,b,c] of wins) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      console.log(`Winner found: ${board[a]} with line [${a},${b},${c}]`);
+      return board[a];
+    }
   }
   return null;
 }
 
 function getAllGames() {
-  // Return all active games as an object or Map
   return activeGames;
 }
+
+// Utility function to get game stats for debugging
+function getGameStats() {
+  const stats = {
+    totalGames: activeGames.size,
+    queueLength: queue.length,
+    games: []
+  };
+  
+  for (const [gameId, game] of activeGames.entries()) {
+    stats.games.push({
+      id: gameId,
+      status: game.state.status,
+      turn: game.state.turn,
+      players: game.players.map(p => ({
+        id: p.playerId,
+        socket: p.socketId,
+        disconnected: p.disconnected || false
+      })),
+      createdAt: new Date(game.createdAt).toISOString(),
+      lastActivity: new Date(game.lastActivity).toISOString()
+    });
+  }
+  
+  return stats;
+}
+
+// Clean up old games periodically
+setInterval(() => {
+  const now = Date.now();
+  const maxAge = 30 * 60 * 1000; // 30 minutes
+  
+  for (const [gameId, game] of activeGames.entries()) {
+    if (now - game.lastActivity > maxAge) {
+      console.log(`Cleaning up old game ${gameId} (inactive for ${Math.floor((now - game.lastActivity) / 1000)}s)`);
+      activeGames.delete(gameId);
+    }
+  }
+}, 5 * 60 * 1000); // Run every 5 minutes
 
 module.exports = {
   enqueuePlayer,
@@ -116,5 +199,6 @@ module.exports = {
   getGame,
   removeGame,
   makeMove,
-  getAllGames
+  getAllGames,
+  getGameStats
 };
