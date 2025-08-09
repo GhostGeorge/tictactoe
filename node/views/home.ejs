@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Home - Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      background: #222;
+      color: white;
+      padding: 1rem;
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+    }
+    header button {
+      background: #ff4c4c;
+      border: none;
+      padding: 0.5rem 1rem;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      padding: 1rem;
+    }
+    .leaderboard {
+      width: 25%;
+      border-left: 1px solid #ccc;
+      padding-left: 1rem;
+    }
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .content button {
+      width: 200px;
+      margin: 0.5rem 0;
+      padding: 1rem;
+      font-size: 1.2rem;
+      cursor: pointer;
+      border-radius: 5px;
+      border: 2px solid #222;
+      background: white;
+      transition: background 0.3s, color 0.3s;
+    }
+    .content button:hover {
+      background: #222;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <form action="/logout" method="GET">
+      <button type="submit">Log Out</button>
+    </form>
+  </header>
+
+  <main>
+    <div class="content">
+      <form action="/queue" method="POST" style="width: 100%; text-align: center;">
+        <button type="submit">Enter Queue (Rated Game)</button>
+      </form>
+
+      <form action="/play-friend" method="GET" style="width: 100%; text-align: center;">
+        <button type="submit">Play a Friend (Password Protected)</button>
+      </form>
+    </div>
+
+    <div class="leaderboard">
+      <h2>Leaderboard</h2>
+      <p>Coming soon...</p>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  // Parse server data from injected JSON
+  const serverData = JSON.parse(document.getElementById('server-data').textContent);
+  const { gameId, playerId, guest: isGuest } = serverData;
+
+  let playerSymbol = null;
+
+  const boardEl = document.getElementById("board");
+  const turnEl = document.getElementById("turnIndicator");
+  const symbolEl = document.getElementById("playerSymbol");
+  const gameStatusEl = document.getElementById("gameStatus");
+
+  // Join the ranked queue/game
+  socket.emit('joinQueue', { playerId, isGuest });
+
+  // When a match is found, you receive the gameId and your symbol
+  socket.on('matchFound', ({ gameId: matchedGameId, symbol }) => {
+    if (matchedGameId === gameId) {
+      playerSymbol = symbol;
+      symbolEl.textContent = `You are ${symbol}`;
+      gameStatusEl.textContent = "Game started!";
+    }
+  });
+
+  // Update board state and turn info
+  socket.on('boardUpdate', ({ board, turn }) => {
+    [...boardEl.children].forEach((cell, idx) => {
+      cell.textContent = board[idx] || "";
+    });
+
+    turnEl.textContent = turn === playerSymbol ? "Your turn" : "Opponent's turn";
+  });
+
+  // Game over event
+  socket.on('gameOver', ({ winner }) => {
+    if (winner === 'draw') {
+      gameStatusEl.textContent = "It's a draw!";
+    } else if (winner === playerSymbol) {
+      gameStatusEl.textContent = "You win! 🎉";
+    } else {
+      gameStatusEl.textContent = "You lost 😢";
+    }
+  });
+
+  // Opponent disconnected
+  socket.on('opponentDisconnected', () => {
+    gameStatusEl.textContent = "Opponent disconnected. You win!";
+  });
+
+  // Error messages from server
+  socket.on('errorMessage', (msg) => {
+    alert(`Error: ${msg}`);
+  });
+
+  socket.on('queueError', ({ message }) => {
+    alert(`Queue error: ${message}`);
+  });
+
+  socket.on('queueUpdate', ({ position }) => {
+    gameStatusEl.textContent = `Waiting in queue... position: ${position}`;
+  });
+
+  // Click handler to make a move
+  boardEl.addEventListener('click', (e) => {
+    if (e.target.dataset.index !== undefined && playerSymbol) {
+      socket.emit('makeMove', { gameId, index: parseInt(e.target.dataset.index) });
+    }
+  });
+</script>

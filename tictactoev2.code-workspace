@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "node-express-webserver-template",
+			"path": "node-express-webserver-template"
+		}
+	],
+	"settings": {}
+}

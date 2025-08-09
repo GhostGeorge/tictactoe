@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Welcome</title>
+  <style>
+    button {
+      padding: 12px 24px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to Tic Tac Toe!</h1>
+
+  <a href="/auth/google">
+    <button>Log in with Google</button>
+  </a>
+
+  <form action="/guest" method="POST" style="display: inline;">
+    <button type="submit">Continue as Guest</button>
+  </form>
+</body>
+</html>
