@@ -39,11 +39,12 @@
       statusEl.textContent = `Queue error: ${message}`;
     });
 
-    socket.on('matchFound', ({ gameId, symbol }) => {
+    socket.on('matchFound', ({ gameId, symbol, playerId: gamePlayerId }) => {
       statusEl.textContent = `Match found! Redirecting to game...`;
+      console.log('Match found! GameId:', gameId, 'Symbol:', symbol, 'Game PlayerId:', gamePlayerId);
 
-      // Redirect to game page
-      window.location.href = `/game/${gameId}`;
+      // Redirect to game page with the actual player ID as a query parameter
+      window.location.href = `/game/${gameId}?playerId=${encodeURIComponent(gamePlayerId || playerId)}`;
     });
 
     socket.on('disconnect', () => {

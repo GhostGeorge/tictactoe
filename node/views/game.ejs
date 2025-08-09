@@ -1,72 +1,219 @@
-<script src="/socket.io/socket.io.js"></script>
-<script>
-  const socket = io();
-
-  // Parse server data from injected JSON
-  const serverData = JSON.parse(document.getElementById('server-data').textContent);
-  const { gameId, playerId, guest: isGuest } = serverData;
-
-  let playerSymbol = null;
-
-  const boardEl = document.getElementById("board");
-  const turnEl = document.getElementById("turnIndicator");
-  const symbolEl = document.getElementById("playerSymbol");
-  const gameStatusEl = document.getElementById("gameStatus");
-
-  // Join the ranked queue/game
-  socket.emit('joinQueue', { playerId, isGuest });
-
-  // When a match is found, you receive the gameId and your symbol
-  socket.on('matchFound', ({ gameId: matchedGameId, symbol }) => {
-    if (matchedGameId === gameId) {
-      playerSymbol = symbol;
-      symbolEl.textContent = `You are ${symbol}`;
-      gameStatusEl.textContent = "Game started!";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tic Tac Toe Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
     }
-  });
+    
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 2px;
+      margin: 20px auto;
+      width: 304px;
+      background: #333;
+    }
+    
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .cell:hover {
+      background: #f0f0f0;
+    }
+    
+    #gameStatus {
+      font-size: 1.5rem;
+      margin: 20px 0;
+      font-weight: bold;
+    }
+    
+    #playerSymbol {
+      font-size: 1.2rem;
+      margin: 10px 0;
+    }
+    
+    #turnIndicator {
+      font-size: 1.1rem;
+      margin: 10px 0;
+      color: #666;
+    }
 
-  // Update board state and turn info
-  socket.on('boardUpdate', ({ board, turn }) => {
-    [...boardEl.children].forEach((cell, idx) => {
-      cell.textContent = board[idx] || "";
+    .timer-container {
+      display: flex;
+      justify-content: space-around;
+      margin: 20px 0;
+      font-size: 1.1rem;
+    }
+
+    .timer {
+      padding: 10px 15px;
+      border: 2px solid #ccc;
+      border-radius: 5px;
+      min-width: 100px;
+    }
+
+    .timer.active {
+      border-color: #007bff;
+      background-color: #e7f3ff;
+    }
+
+    .timer.warning {
+      border-color: #ff6b6b;
+      background-color: #ffe6e6;
+      color: #d63384;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tic Tac Toe</h1>
+  
+  <div id="gameStatus">Connecting to game...</div>
+  <div id="playerSymbol">Waiting for symbol assignment...</div>
+  <div id="turnIndicator">Waiting for game to start...</div>
+  
+  <div class="timer-container">
+    <div class="timer" id="playerXTimer">
+      <div>Player X</div>
+      <div id="xTimeRemaining">1:00</div>
+    </div>
+    <div class="timer" id="playerOTimer">
+      <div>Player O</div>
+      <div id="oTimeRemaining">1:00</div>
+    </div>
+  </div>
+  
+  <div id="board">
+    <div class="cell" data-index="0"></div>
+    <div class="cell" data-index="1"></div>
+    <div class="cell" data-index="2"></div>
+    <div class="cell" data-index="3"></div>
+    <div class="cell" data-index="4"></div>
+    <div class="cell" data-index="5"></div>
+    <div class="cell" data-index="6"></div>
+    <div class="cell" data-index="7"></div>
+    <div class="cell" data-index="8"></div>
+  </div>
+
+  <script id="server-data" type="application/json">
+    <%- JSON.stringify({ gameId, playerId, guest }) %>
+  </script>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Parse server data from injected JSON
+    const serverData = JSON.parse(document.getElementById('server-data').textContent);
+    const { gameId, playerId: sessionPlayerId, guest: isGuest } = serverData;
+
+    // Use the game player ID if available, otherwise fall back to session player ID
+    const gamePlayerId = sessionStorage.getItem('gamePlayerId') || sessionPlayerId;
+    console.log('Using playerId for game:', gamePlayerId, '(session playerId was:', sessionPlayerId, ')');
+
+    let playerSymbol = null;
+
+    const boardEl = document.getElementById("board");
+    const turnEl = document.getElementById("turnIndicator");
+    const symbolEl = document.getElementById("playerSymbol");
+    const gameStatusEl = document.getElementById("gameStatus");
+
+    console.log('Game page loaded. GameID:', gameId, 'PlayerID:', gamePlayerId, 'Guest:', isGuest);
+
+    // Don't join queue again - we're already in a game
+    // Instead, just wait for the match found event or request current game state
+    
+    // When a match is found, you receive the gameId and your symbol
+    socket.on('matchFound', ({ gameId: matchedGameId, symbol }) => {
+      if (matchedGameId === gameId) {
+        playerSymbol = symbol;
+        symbolEl.textContent = `You are ${symbol}`;
+        gameStatusEl.textContent = "Game started!";
+        console.log('Match found! You are:', symbol);
+      }
     });
 
-    turnEl.textContent = turn === playerSymbol ? "Your turn" : "Opponent's turn";
-  });
+    // Update board state and turn info
+    socket.on('boardUpdate', ({ board, turn }) => {
+      console.log('Board update:', board, 'Turn:', turn);
+      [...boardEl.children].forEach((cell, idx) => {
+        cell.textContent = board[idx] || "";
+      });
 
-  // Game over event
-  socket.on('gameOver', ({ winner }) => {
-    if (winner === 'draw') {
-      gameStatusEl.textContent = "It's a draw!";
-    } else if (winner === playerSymbol) {
-      gameStatusEl.textContent = "You win! 🎉";
-    } else {
-      gameStatusEl.textContent = "You lost 😢";
-    }
-  });
+      if (playerSymbol) {
+        turnEl.textContent = turn === gamePlayerId ? "Your turn" : "Opponent's turn";
+      }
+    });
 
-  // Opponent disconnected
-  socket.on('opponentDisconnected', () => {
-    gameStatusEl.textContent = "Opponent disconnected. You win!";
-  });
+    // Game over event
+    socket.on('gameOver', ({ winner }) => {
+      console.log('Game over:', winner);
+      if (winner === 'draw') {
+        gameStatusEl.textContent = "It's a draw!";
+      } else if (winner === gamePlayerId) {
+        gameStatusEl.textContent = "You win! 🎉";
+      } else {
+        gameStatusEl.textContent = "You lost 😢";
+      }
+    });
 
-  // Error messages from server
-  socket.on('errorMessage', (msg) => {
-    alert(`Error: ${msg}`);
-  });
+    // Opponent disconnected
+    socket.on('opponentDisconnected', () => {
+      gameStatusEl.textContent = "Opponent disconnected. You win!";
+    });
 
-  socket.on('queueError', ({ message }) => {
-    alert(`Queue error: ${message}`);
-  });
+    // Error messages from server
+    socket.on('errorMessage', (msg) => {
+      console.error('Error:', msg);
+      alert(`Error: ${msg}`);
+    });
 
-  socket.on('queueUpdate', ({ position }) => {
-    gameStatusEl.textContent = `Waiting in queue... position: ${position}`;
-  });
+    socket.on('queueError', ({ message }) => {
+      console.error('Queue error:', message);
+      alert(`Queue error: ${message}`);
+    });
 
-  // Click handler to make a move
-  boardEl.addEventListener('click', (e) => {
-    if (e.target.dataset.index !== undefined && playerSymbol) {
-      socket.emit('makeMove', { gameId, index: parseInt(e.target.dataset.index) });
-    }
-  });
-</script>
+    socket.on('queueUpdate', ({ position }) => {
+      gameStatusEl.textContent = `Waiting in queue... position: ${position}`;
+    });
+
+    // Click handler to make a move
+    boardEl.addEventListener('click', (e) => {
+      if (e.target.dataset.index !== undefined && playerSymbol) {
+        const index = parseInt(e.target.dataset.index);
+        console.log('Making move at index:', index);
+        socket.emit('makeMove', { gameId, index });
+      }
+    });
+
+    // Request current game state when we connect
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      gameStatusEl.textContent = "Connected! Joining game...";
+      
+      // Join the existing game with our player ID
+      console.log('Joining game:', gameId, 'as player:', gamePlayerId);
+      socket.emit('joinGame', { gameId, playerId: gamePlayerId });
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      gameStatusEl.textContent = 'Disconnected from server.';
+    });
+  </script>
+</body>
+</html>

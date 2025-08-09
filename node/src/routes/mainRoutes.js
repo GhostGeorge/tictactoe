@@ -53,33 +53,16 @@ router.post('/guest', (req, res) => {
 });
 
 // Game routes
-// Enter matchmaking queue - currently just a placeholder
-/*
-router.post('/queue', ensureGuestOrLoggedIn, (req, res) => {
-  const playerId = req.user ? req.user.id : req.sessionID; // use session ID for guests
-  const isGuest = req.session.guest === true;
-
-  const result = enqueuePlayer({ playerId, isGuest });
-
-  if (!result) {
-    return res.status(400).send('Already in queue');
-  }
-
-  if (result.matched) {
-    const { gameId } = result;
-    return res.redirect(`/game/${gameId}`);
-  } else {
-    return res.send('Waiting for opponent...');
-  }
-});
-*/
-
 router.get('/queue', ensureGuestOrLoggedIn, (req, res) => {
   const playerId = req.user ? req.user.id : req.sessionID;
   const guest = req.session.guest === true;
+  
+  // Store player info in session for later reconnection
+  req.session.playerId = playerId;
+  req.session.isGuest = guest;
+  
   res.render('queue', { playerId, guest });
 });
-
 
 // Redirect to game page
 router.get('/game/:gameId', ensureGuestOrLoggedIn, (req, res) => {
@@ -87,14 +70,31 @@ router.get('/game/:gameId', ensureGuestOrLoggedIn, (req, res) => {
   const game = getGame(gameId);
 
   if (!game) {
-    return res.status(404).send('Game not found');
+    console.log(`Game ${gameId} not found. Redirecting to home.`);
+    return res.redirect('/home');
   }
 
-  // Optionally verify the current user is a participant here...
+  // Get playerId from query parameter (for dev mode) or session (for production)
+  const playerId = req.query.playerId || (req.user ? req.user.id : req.sessionID);
+  
+  console.log(`Checking game access: gameId=${gameId}, requestedPlayerId=${playerId}`);
+  console.log(`Game players:`, game.players.map(p => ({ playerId: p.playerId, socketId: p.socketId })));
+
+  // Check if this player is actually in this game
+  const isPlayerInGame = game.players.some(p => p.playerId === playerId);
+  
+  if (!isPlayerInGame) {
+    console.log(`Player ${playerId} not found in game ${gameId}. Players:`, game.players.map(p => p.playerId));
+    return res.redirect('/home');
+  }
+
+  // Store current game info in session
+  req.session.currentGameId = gameId;
+  req.session.currentPlayerId = playerId; // Store the actual game player ID
 
   res.render('game', {
     gameId,
-    playerId: req.user ? req.user.id : req.sessionID,
+    playerId,
     guest: req.session.guest,
   });
 });
