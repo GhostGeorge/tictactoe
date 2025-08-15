@@ -187,6 +187,19 @@
       background: #6c757d;
       cursor: not-allowed;
     }
+
+    button.queue-button {
+      background: #28a745;
+      font-weight: bold;
+    }
+
+    button.queue-button:hover {
+      background: #218838;
+    }
+
+    .button-container {
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
@@ -203,11 +216,11 @@
   
   <div class="timer-container">
     <div class="timer" id="playerXTimer">
-      <div class="timer-label">Player X</div>
+      <div class="timer-label" id="xLabel">Player X</div>
       <div class="timer-value" id="xTimeRemaining">1:00</div>
     </div>
     <div class="timer" id="playerOTimer">
-      <div class="timer-label">Player O</div>
+      <div class="timer-label" id="oLabel">Player O</div>
       <div class="timer-value" id="oTimeRemaining">1:00</div>
     </div>
   </div>
@@ -224,9 +237,9 @@
     <div class="cell" data-index="8"></div>
   </div>
 
-  <div style="margin-top: 20px;">
+  <div class="button-container">
     <button onclick="window.location.href='/home'">Return Home</button>
-    <button onclick="location.reload()">Refresh Game</button>
+    <button id="newGameButton" class="queue-button" style="display: none;" onclick="window.location.href='/queue'">Queue New Game</button>
   </div>
 
   <script id="server-data" type="application/json">
@@ -249,6 +262,14 @@
     let timerInterval = null;
     let opponentConnected = true;
 
+    // Timer state (server authoritative base timers keyed by playerId)
+    let baseTimers = {};          // { playerId1: msRemaining, playerId2: msRemaining }
+    let turnStartTime = null;     // server timestamp when current turn started (ms)
+    let currentTurnPlayerId = null; // server playerId whose turn it is
+
+    // local interval for smooth countdown
+    let localTimerInterval = null;
+
     // DOM elements
     const boardEl = document.getElementById("board");
     const turnEl = document.getElementById("turnIndicator");
@@ -260,77 +281,110 @@
     const oTimerEl = document.getElementById("oTimeRemaining");
     const xTimerContainer = document.getElementById("playerXTimer");
     const oTimerContainer = document.getElementById("playerOTimer");
+    const newGameButton = document.getElementById("newGameButton");
 
     console.log('Game page loaded. GameID:', gameId, 'PlayerID:', playerId, 'Guest:', isGuest);
-
-    // Format time display
-    function formatTime(milliseconds) {
-      const seconds = Math.ceil(milliseconds / 1000);
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
+// ---------- utils ----------
+    function formatTime(ms) {
+      ms = Math.max(0, Math.floor(ms));
+      const totalSeconds = Math.ceil(ms / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    // Update timer display
-    function updateTimerDisplay(timers, currentPlayerTimer, turnStartTime) {
-      if (!timers || !gameActive) return;
-
-      // Clear existing timer interval
-      if (timerInterval) {
-        clearInterval(timerInterval);
-      }
-
-      // Update static timers
-      const playerXId = Object.keys(timers)[0];
-      const playerOId = Object.keys(timers)[1];
-      
-      xTimerEl.textContent = formatTime(timers[playerXId] || 60000);
-      oTimerEl.textContent = formatTime(timers[playerOId] || 60000);
-
-      // Highlight active player's timer
-      xTimerContainer.classList.toggle('active', currentTurn === 'X');
-      oTimerContainer.classList.toggle('active', currentTurn === 'O');
-
-      // Start countdown for current player if we have the data
-      if (currentPlayerTimer !== null && currentTurn && turnStartTime) {
-        let remainingTime = currentPlayerTimer;
-        const startTime = Date.now();
-        
-        timerInterval = setInterval(() => {
-          const elapsed = Date.now() - startTime;
-          const currentRemaining = Math.max(0, remainingTime - elapsed);
-          
-          if (currentTurn === 'X') {
-            xTimerEl.textContent = formatTime(currentRemaining);
-            xTimerContainer.classList.toggle('warning', currentRemaining < 10000);
-          } else if (currentTurn === 'O') {
-            oTimerEl.textContent = formatTime(currentRemaining);
-            oTimerContainer.classList.toggle('warning', currentRemaining < 10000);
-          }
-          
-          if (currentRemaining <= 0) {
-            clearInterval(timerInterval);
-          }
-        }, 100);
+    function updateTimerDisplaysImmediately() {
+      // We render base timers for both players (these are server stored values)
+      const playerIds = Object.keys(baseTimers);
+      if (playerIds.length >= 2) {
+        const p0 = baseTimers[playerIds[0]] ?? 60000;
+        const p1 = baseTimers[playerIds[1]] ?? 60000;
+        // Show the stored base values — the active player's display will be overwritten by the local countdown
+        xTimerEl.textContent = formatTime(convertToMsIfNumber(p0));
+        oTimerEl.textContent = formatTime(convertToMsIfNumber(p1));
+      } else {
+        // fallback
+        xTimerEl.textContent = formatTime(60000);
+        oTimerEl.textContent = formatTime(60000);
       }
     }
 
-    // Update board display
+    function convertToMsIfNumber(v) {
+      // server sends numbers in ms already; keep compat
+      return typeof v === 'number' ? v : 60000;
+    }
+
+    // Start local countdown for active player, using baseTimers + turnStartTime (server values)
+    function startLocalCountdown() {
+      clearInterval(localTimerInterval);
+      if (!currentTurnPlayerId || !turnStartTime || !baseTimers[currentTurnPlayerId]) return;
+
+      const activePlayerId = currentTurnPlayerId;
+      const tick = () => {
+        const elapsed = Date.now() - turnStartTime;
+        const remaining = Math.max(0, baseTimers[activePlayerId] - elapsed);
+
+        // Update UI for active player
+        // determine which timer element is "You" and which is "Opponent"
+        const yourTimerEl = playerSymbol === 'X' ? xTimerEl : oTimerEl;
+        const opponentTimerEl = playerSymbol === 'X' ? oTimerEl : xTimerEl;
+        const yourTimerContainer = playerSymbol === 'X' ? xTimerContainer : oTimerContainer;
+        const opponentTimerContainer = playerSymbol === 'X' ? oTimerContainer : xTimerContainer;
+
+        // update timer displays
+        if (currentTurn === playerSymbol) {
+          // Your turn
+          yourTimerEl.textContent = formatTime(remaining);
+          yourTimerContainer.classList.add('active');
+          yourTimerContainer.classList.toggle('warning', remaining < 10000);
+          opponentTimerContainer.classList.remove('active', 'warning');
+        } else {
+          // Opponent's turn
+          opponentTimerEl.textContent = formatTime(remaining);
+          opponentTimerContainer.classList.add('active');
+          opponentTimerContainer.classList.toggle('warning', remaining < 10000);
+          yourTimerContainer.classList.remove('active', 'warning');
+        }
+
+        // If time ran out locally, stop ticking (server will detect and send gameOver)
+        if (remaining <= 0) {
+          clearInterval(localTimerInterval);
+        }
+      };
+
+      // run immediately and then every 100ms for smoothness
+      tick();
+      localTimerInterval = setInterval(tick, 100);
+    }
+
+    function stopLocalCountdown() {
+      clearInterval(localTimerInterval);
+      xTimerContainer.classList.remove('active', 'warning');
+      oTimerContainer.classList.remove('active', 'warning');
+    }
+
+    function isSymbolXForPlayer(pid) {
+      // find which symbol this playerId maps to using the board players order if available
+      // We'll infer from baseTimers keys order: first key -> X, second -> O in server sends
+      const keys = Object.keys(baseTimers);
+      if (keys.length < 2) return null;
+      return keys[0] === pid;
+    }
+
+    // Update board visuals (cells)
     function updateBoard(board) {
       [...boardEl.children].forEach((cell, idx) => {
         const value = board[idx];
         cell.textContent = value || "";
         cell.classList.toggle('taken', !!value);
-        
-        // Add color coding for X and O
         cell.style.color = value === 'X' ? '#007bff' : value === 'O' ? '#dc3545' : '#000';
       });
     }
 
-    // Update turn indicator
+    // Update turn indicator text
     function updateTurnIndicator() {
       if (!gameActive) return;
-      
+
       if (currentTurn === playerSymbol) {
         turnEl.textContent = "Your turn";
         turnEl.style.color = "#007bff";
@@ -346,13 +400,17 @@
       }
     }
 
-    // Socket event handlers
+    function showNewGameButton() {
+      newGameButton.style.display = "inline-block";
+    }
+
+    // ---------- socket handlers ----------
     socket.on('connect', () => {
       console.log('Connected to server');
       connectionStatusEl.textContent = 'Connected';
       connectionStatusEl.className = 'connection-status connected';
       gameStatusEl.textContent = "Connected! Joining game...";
-      
+
       socket.emit('joinGame', { gameId, playerId });
     });
 
@@ -361,7 +419,7 @@
       connectionStatusEl.textContent = 'Disconnected';
       connectionStatusEl.className = 'connection-status disconnected';
       gameStatusEl.textContent = 'Disconnected from server. Trying to reconnect...';
-      if (timerInterval) clearInterval(timerInterval);
+      stopLocalCountdown();
     });
 
     socket.on('matchFound', ({ gameId: matchedGameId, symbol, playerId: gamePlayerId, playerIndex: pIndex }) => {
@@ -373,32 +431,70 @@
         gameActive = true;
         console.log('Match found! You are:', symbol, 'Player index:', playerIndex);
       }
+      if (playerSymbol === 'X') {
+        document.getElementById('xLabel').textContent = 'You';
+        document.getElementById('oLabel').textContent = 'Opponent';
+      } else {
+        document.getElementById('xLabel').textContent = 'Opponent';
+        document.getElementById('oLabel').textContent = 'You';
+      }
     });
 
-    socket.on('boardUpdate', ({ board, turn, timers, currentPlayerTimer, turnStartTime }) => {
-      console.log('Board update:', { board, turn, timers, currentPlayerTimer });
-      
+    // MAIN SYNC: server sends authoritative board + base timers + current turn details
+    socket.on('boardUpdate', ({ board, turn, timers, currentPlayerTimer, turnStartTime: ts }) => {
+      // timers is base stored times keyed by playerId (ms)
+      console.log('Board update received', { board, turn, timers, currentPlayerTimer, ts });
+
       updateBoard(board);
-      currentTurn = turn;
+
+      // update turn symbol and playerId mapping
+      currentTurn = turn; // 'X' or 'O'
       updateTurnIndicator();
-      
+
+      // adopt server timers
       if (timers) {
-        updateTimerDisplay(timers, currentPlayerTimer, turnStartTime);
+        baseTimers = { ...timers }; // shallow copy
+      }
+
+      // adopt server turnStartTime and figure currentTurnPlayerId
+      if (ts) {
+        // server provides a numeric timestamp (ms)
+        turnStartTime = ts;
+      } else {
+        turnStartTime = null;
+      }
+
+      // find playerId for the current turn symbol:
+      // mapping: server sends timers as { [player0Id]: ms, [player1Id]: ms }
+      // convertPlayerIdToSymbol on server used player index 0 -> 'X', 1 -> 'O'
+      // so derive playerId:
+      const playerIds = Object.keys(baseTimers);
+      if (playerIds.length >= 2) {
+        const symbolAtIndex0 = 'X'; // server uses index 0 -> X
+        const pidForX = playerIds[0];
+        const pidForO = playerIds[1];
+        currentTurnPlayerId = (turn === 'X') ? pidForX : pidForO;
+      } else {
+        currentTurnPlayerId = null;
+      }
+
+      // update static timer displays and start local countdown for active player
+      updateTimerDisplaysImmediately();
+      stopLocalCountdown();
+      if (currentTurnPlayerId && turnStartTime) {
+        startLocalCountdown();
       }
     });
 
+    // game over
     socket.on('gameOver', ({ winner, reason }) => {
-      console.log('Game over:', winner, 'Reason:', reason);
+      console.log('Game over:', winner, reason);
       gameActive = false;
-      
-      if (timerInterval) {
-        clearInterval(timerInterval);
-      }
-      
-      // Clear timer highlighting
+      stopLocalCountdown();
+
       xTimerContainer.classList.remove('active', 'warning');
       oTimerContainer.classList.remove('active', 'warning');
-      
+
       let message = '';
       if (winner === 'draw') {
         message = "It's a draw! 🤝";
@@ -410,19 +506,22 @@
         message = "You lose 😢";
         gameStatusEl.style.color = "#dc3545";
       }
-      
+
       if (reason === 'timeout') {
         message += " (Time ran out)";
+      } else if (reason === 'opponent_disconnect') {
+        message += " (Opponent disconnected)";
       }
-      
+
       gameStatusEl.textContent = message;
       turnEl.textContent = "Game finished";
+      showNewGameButton();
     });
 
     socket.on('opponentDisconnected', () => {
       console.log('Opponent disconnected');
       opponentConnected = false;
-      opponentStatusEl.textContent = "Opponent disconnected - their timer will run down";
+      opponentStatusEl.textContent = "Opponent disconnected - they have 10 seconds to reconnect or they lose";
       opponentStatusEl.className = "opponent-status opponent-disconnected";
       opponentStatusEl.style.display = "block";
       updateTurnIndicator();
@@ -451,20 +550,21 @@
       gameStatusEl.style.color = "#dc3545";
     });
 
-    // Click handler for moves
+    // click handler (sends makeMove which the server will use to commit time)
     boardEl.addEventListener('click', (e) => {
       if (!gameActive || currentTurn !== playerSymbol) return;
-      
+
       const cell = e.target;
       if (!cell.classList.contains('cell') || cell.classList.contains('taken')) return;
-      
+
       const index = parseInt(cell.dataset.index);
       if (isNaN(index)) return;
-      
+
       console.log('Making move at index:', index);
+      // emit move to server (server will calculate elapsed time based on its turnStartTime)
       socket.emit('makeMove', { gameId, index });
-      
-      // Provide immediate feedback
+
+      // provide immediate feedback (visual)
       cell.style.background = '#e9ecef';
       setTimeout(() => {
         if (!cell.classList.contains('taken')) {
@@ -473,19 +573,19 @@
       }, 200);
     });
 
-    // Keyboard support
+    // keyboard support (unchanged)
     document.addEventListener('keydown', (e) => {
       if (!gameActive || currentTurn !== playerSymbol) return;
-      
+
       const key = e.key;
       let index = -1;
-      
+
       if (key >= '1' && key <= '9') {
         index = parseInt(key) - 1;
       } else if (key >= '0' && key <= '8') {
         index = parseInt(key);
       }
-      
+
       if (index >= 0 && index <= 8) {
         const cell = boardEl.children[index];
         if (cell && !cell.classList.contains('taken')) {
@@ -494,11 +594,9 @@
       }
     });
 
-    // Clean up on page unload
+    // cleanup on unload
     window.addEventListener('beforeunload', () => {
-      if (timerInterval) {
-        clearInterval(timerInterval);
-      }
+      stopLocalCountdown();
     });
   </script>
 </body>
