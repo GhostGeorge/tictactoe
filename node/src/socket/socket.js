@@ -6,6 +6,7 @@ const {
   makeMove,
   getAllGames
 } = require('../gamemanager/matchmaking');
+const { logGameResult } = require('./logGameResult');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -23,7 +24,7 @@ module.exports = function(io) {
       console.log('Received joinQueue from', socket.id, 'playerId:', playerId, 'guest:', isGuest);
 
       if (isDev) {
-        playerId = 'dev_' + Math.random().toString(36).substring(2, 10);
+        playerId = Math.floor(Math.random() * 1e12); // random large number
         console.log(`Development mode: assigned random playerId ${playerId} for socket ${socket.id}`);
       } else if (!playerId) {
         io.to(socket.id).emit('queueError', { message: 'Missing playerId' });
@@ -187,6 +188,9 @@ module.exports = function(io) {
 
       if (moveResult.finished) {
         handleGameEnd(game, moveResult);
+        // Log the game result
+        const winnerId = moveResult.winner || null; // null if draw
+        logGameResult(game, winnerId);
       }
     });
 
@@ -311,6 +315,9 @@ module.exports = function(io) {
           game.timers[currentPlayerId] = 0;
           console.log(`⏰ Player ${currentPlayerId} timed out in game ${gameId}`);
           handleGameTimeout(game, currentPlayerId);
+
+          //Log the game result
+          logGameResult(game, game.state.winner); // winner will be set in timeout handler
 
           // stop monitor for this game (handleGameTimeout will clear interval & remove game)
           if (gameTimers.has(gameId)) {

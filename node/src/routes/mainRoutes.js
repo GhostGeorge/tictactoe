@@ -13,6 +13,9 @@ const indexController = require('../controllers/indexController');
 // GET Routes
 router.get('/test-error', (req, res) => {throw new Error('This is a test error!');}); // Show the errorHandler working
 
+// Initialise Supabase client
+const supabase = require('../supabase/supabaseClient');
+
 // Debug route for development
 if (process.env.NODE_ENV === 'development') {
   router.get('/debug/games', (req, res) => {
@@ -153,9 +156,64 @@ router.get("/auth/google",
 
 router.get("/auth/google/callback",
   passport.authenticate("google", { failureRedirect: "/?error=auth_failed" }),
-  (req, res) => {
-    console.log('Google auth successful for user:', req.user.id);
-    res.redirect("/home");
+  async (req, res) => {
+    try {
+      const { id, displayName } = req.user; // Google info
+      const email = req.user.emails?.[0]?.value || req.user._json?.email;
+
+      console.log('Google auth successful for user:', id);
+
+      // Check if user exists
+      const { data: existingUser, error: selectError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') { // 116 = no rows found
+        console.error('Supabase select error:', selectError);
+      }
+
+      if (!existingUser) {
+        // Insert new user with default elo
+        const { data: insertedUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{ id, email, name: displayName, elo: 1000 }])
+          .select(); // fetch inserted row
+
+        if (insertError) console.error('Supabase insert error:', insertError);
+        else console.log('New user inserted:', insertedUser);
+      } else {
+        console.log('User already exists:', existingUser);
+
+        // Update email and name if they changed
+        const updates = {};
+        if (existingUser.email !== email) updates.email = email;
+        if (existingUser.name !== displayName) updates.name = displayName;
+
+        if (Object.keys(updates).length > 0) {
+          const { data: updatedUser, error: updateError } = await supabase
+            .from('users')
+            .update(updates)
+            .eq('id', id)
+            .select();
+
+          if (updateError) console.error('Supabase update error:', updateError);
+          else console.log('User updated:', updatedUser);
+        }
+      }
+
+      // Save in session
+      req.session.userId = id;
+      req.session.email = email;
+
+      res.redirect("/home");
+    } catch (err) {
+      console.error('Error handling Google login:', err);
+      res.redirect("/?error=internal_error");
+    }
+
+    console.log('Google profile object:', req.user);
   });
 
 router.get("/logout", (req, res) => {

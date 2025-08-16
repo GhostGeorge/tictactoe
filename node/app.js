@@ -12,21 +12,38 @@ const favicon = require('serve-favicon');
 // Express setup
 const app = express();
 
+// Supabase
+const supabase = require('./src/supabase/supabaseClient');
+
 // Logger setup
 const logger = require('./src/middlewares/logger');
 app.use(logger);
 
 // Setup session middleware
+const pgSession = require('connect-pg-simple')(session);
+const { Pool } = require('pg');
+
+const pool = new Pool({
+    connectionString: process.env.SUPABASE_DB_URL, // full connection string from Supabase
+    ssl: { rejectUnauthorized: false }
+});
+
 app.use(session({
+    store: new pgSession({
+        pool: pool,
+        tableName: 'session',
+        createTableIfMissing: false // table is already created above
+    }),
     secret: process.env.SESSION_KEY,
     resave: false,
-    saveUninitialized: true,
-    //cookie: { secure: process.env.NODE_ENV === 'production' } // For HTTP, set to true for HTTPS
+    saveUninitialized: false,
     cookie: {
-        secure: false, // allow over HTTP
-        sameSite: 'lax' // helps prevent OAuth issues
+        secure: false, // true if HTTPS
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     }
 }));
+
 
 // Serve favicon
 app.use(favicon(path.join(__dirname, 'public', 'images', 'icon.png')));
@@ -51,12 +68,48 @@ passport.use(new GoogleStrategy({
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: "/auth/google/callback"
 },
-(accessToken, refreshToken, profile, done) => {
-  return done(null, profile);
+async (accessToken, refreshToken, profile, done) => {
+  try {
+    const googleId = profile.id;
+
+    // Upsert into Supabase by google_id
+    const { data, error } = await supabase
+    .from('users')
+    .upsert({
+      google_id: profile.id,
+      email: profile.emails[0].value,
+      name: profile.displayName
+    }, { onConflict: 'google_id' })
+    .select()
+    .single();
+
+
+    if (error) return done(new Error(error.message));
+    return done(null, data); 
+  } catch (err) {
+    done(err);
+  }
 }));
 
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
+// Serialize and deserialize user
+passport.serializeUser((user, done) => {
+  done(null, user.google_id); // store google_id in session
+});
+
+passport.deserializeUser(async (google_id, done) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('google_id', google_id)
+      .single();
+
+    if (error) return done(new Error(error.message));
+    done(null, data);
+  } catch (err) {
+    done(err);
+  }
+});
 
 // Protection middleware
 const protection = require('./src/middlewares/protection');

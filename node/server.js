@@ -7,7 +7,7 @@ const dotenv = require('dotenv');
 dotenv.config({ path: '../.env' }); // The .env file is outside the ./server.js folder root.
 
 // === .env checking ===
-const requiredEnvVars = ['SESSION_KEY', 'NODE_ENV', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'EXPRESS_PORT'];
+const requiredEnvVars = ['SESSION_KEY', 'NODE_ENV', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'EXPRESS_PORT', 'SUPABASE_DB_URL', 'SUPABASE_SERVICE_KEY'];
 const missingVars = requiredEnvVars.filter((key) => !process.env[key] || process.env[key].trim() === '');
 if (missingVars.length > 0) {
     console.error('(app.js) Missing required environment variables (.env file):'.red, missingVars.join(', ').yellow);
