@@ -6,84 +6,598 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 0; padding: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+      margin: 0;
     }
-    header {
-      background: #222;
-      color: white;
-      padding: 1rem;
+    
+    .home-container {
+      max-width: 800px;
+      margin: 0 auto;
       display: flex;
-      justify-content: flex-start;
-      align-items: center;
+      gap: 20px;
     }
-    header button {
-      background: #ff4c4c;
-      border: none;
-      padding: 0.5rem 1rem;
-      color: white;
+    
+    .main-content {
+      flex: 1;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 2.5rem;
+    }
+    
+    .user-info {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 30px;
+      font-size: 1.1rem;
+      color: #495057;
+      border: 1px solid #dee2e6;
+    }
+    
+    .user-name {
       font-weight: bold;
-      cursor: pointer;
-      border-radius: 3px;
+      color: #007bff;
     }
-    main {
-      flex: 1;
-      display: flex;
-      padding: 1rem;
+    
+    .game-buttons {
+      margin-bottom: 30px;
     }
-    .leaderboard {
-      width: 25%;
-      border-left: 1px solid #ccc;
-      padding-left: 1rem;
-    }
-    .content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-    }
-    .content button {
-      width: 200px;
-      margin: 0.5rem 0;
-      padding: 1rem;
+    
+    .game-buttons button {
+      width: 100%;
+      max-width: 300px;
+      margin: 10px 0;
+      padding: 15px;
       font-size: 1.2rem;
       cursor: pointer;
       border-radius: 5px;
-      border: 2px solid #222;
+      border: 2px solid #007bff;
       background: white;
-      transition: background 0.3s, color 0.3s;
+      color: #007bff;
+      transition: all 0.3s;
+      font-weight: bold;
     }
-    .content button:hover {
-      background: #222;
+    
+    .game-buttons button:hover {
+      background: #007bff;
       color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,123,255,0.3);
+    }
+    
+    .game-buttons button.secondary {
+      border-color: #6c757d;
+      color: #6c757d;
+    }
+    
+    .game-buttons button.secondary:hover {
+      background: #6c757d;
+      color: white;
+    }
+    
+    .logout-section {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #dee2e6;
+    }
+    
+    .logout-section button {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background-color 0.2s;
+    }
+    
+    .logout-section button:hover {
+      background: #c82333;
+    }
+    
+    .game-info {
+      color: #666;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-top: 20px;
+      background: #e9ecef;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    .leaderboard {
+      width: 400px;
+      background: white;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+    }
+    .leaderboard h2 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: #333;
+      font-size: 1.3rem;
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 0.5rem;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 5px;
+      text-align: center;
+      border: 1px solid #dee2e6;
+    }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #007bff;
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 0.25rem;
+    }
+    .leaderboard-section {
+      margin-bottom: 1.5rem;
+    }
+    .leaderboard-section h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .leaderboard-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .leaderboard-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    .leaderboard-item:last-child {
+      border-bottom: none;
+    }
+    .player-rank {
+      background: #007bff;
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+    .player-rank.gold { background: #ffd700; color: #333; }
+    .player-rank.silver { background: #c0c0c0; color: #333; }
+    .player-rank.bronze { background: #cd7f32; color: white; }
+    .player-info {
+      flex: 1;
+      margin-left: 0.75rem;
+    }
+    .player-name {
+      font-weight: bold;
+      color: #333;
+    }
+    .player-stats {
+      font-size: 0.8rem;
+      color: #666;
+    }
+    .player-value {
+      font-weight: bold;
+      color: #007bff;
+    }
+    .recent-games {
+      font-size: 0.85rem;
+    }
+    .recent-game {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    .recent-game:last-child {
+      border-bottom: none;
+    }
+    .game-result {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .winner {
+      color: #28a745;
+      font-weight: bold;
+    }
+    .error-message {
+      color: #dc3545;
+      font-style: italic;
+      text-align: center;
+      padding: 1rem;
+    }
+    
+    .leaderboard {
+      width: 400px;
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+    }
+    
+    .leaderboard h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #333;
+      font-size: 1.5rem;
+      text-align: center;
+      border-bottom: 3px solid #007bff;
+      padding-bottom: 10px;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    
+    .stat-card {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #dee2e6;
+      transition: transform 0.2s;
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .stat-number {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #007bff;
+      margin-bottom: 5px;
+    }
+    
+    .stat-label {
+      font-size: 0.85rem;
+      color: #666;
+      font-weight: 500;
+    }
+    
+    .leaderboard-section {
+      margin-bottom: 25px;
+    }
+    
+    .leaderboard-section h3 {
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #dee2e6;
+    }
+    
+    .leaderboard-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .leaderboard-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f3f4;
+      transition: background-color 0.2s;
+    }
+    
+    .leaderboard-item:hover {
+      background-color: #f8f9fa;
+      border-radius: 5px;
+      margin: 0 -5px;
+      padding-left: 17px;
+      padding-right: 17px;
+    }
+    
+    .leaderboard-item:last-child {
+      border-bottom: none;
+    }
+    
+    .player-rank {
+      background: #007bff;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: bold;
+      min-width: 28px;
+    }
+    
+    .player-rank.gold { 
+      background: linear-gradient(135deg, #ffd700, #ffed4e); 
+      color: #333;
+      box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+    }
+    .player-rank.silver { 
+      background: linear-gradient(135deg, #c0c0c0, #e8e8e8); 
+      color: #333;
+      box-shadow: 0 2px 4px rgba(192, 192, 192, 0.3);
+    }
+    .player-rank.bronze { 
+      background: linear-gradient(135deg, #cd7f32, #d4933f); 
+      color: white;
+      box-shadow: 0 2px 4px rgba(205, 127, 50, 0.3);
+    }
+    
+    .player-info {
+      flex: 1;
+      margin-left: 12px;
+      text-align: left;
+    }
+    
+    .player-name {
+      font-weight: bold;
+      color: #333;
+      font-size: 0.95rem;
+    }
+    
+    .player-stats {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 2px;
+    }
+    
+    .player-value {
+      font-weight: bold;
+      color: #007bff;
+      font-size: 0.95rem;
+    }
+    
+    .recent-games {
+      font-size: 0.85rem;
+    }
+    
+    .recent-game {
+      padding: 8px 0;
+      border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .recent-game:last-child {
+      border-bottom: none;
+    }
+    
+    .game-result {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .game-players {
+      color: #495057;
+    }
+    
+    .winner {
+      color: #28a745;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+    
+    .error-message {
+      color: #dc3545;
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 5px;
+    }
+    
+    @media (max-width: 768px) {
+      .home-container {
+        flex-direction: column;
+        max-width: 100%;
+        padding: 10px;
+        gap: 15px;
+      }
+      
+      .leaderboard {
+        width: 100%;
+      }
+      
+      .main-content {
+        padding: 20px;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <form action="/logout" method="GET">
-      <button type="submit">Log Out</button>
-    </form>
-  </header>
+  <div class="home-container">
+    <div class="main-content">
+      <h1>🎮 Tic Tac Toe</h1>
+      
+      <div class="user-info">
+        <% if (guest) { %>
+          Playing as <span class="user-name">Guest</span>
+        <% } else if (user) { %>
+          Welcome back, <span class="user-name"><%= user.name %></span>!
+        <% } else { %>
+          Welcome to Tic Tac Toe!
+        <% } %>
+      </div>
 
-  <main>
-    <div class="content">
-      <form action="/queue" method="GET" style="width: 100%; text-align: center;">
-        <button type="submit">Enter Queue (Rated Game)</button>
-      </form>
+      <div class="game-buttons">
+        <form action="/queue" method="GET" style="width: 100%; text-align: center;">
+          <button type="submit">🚀 Enter Queue (Rated Game)</button>
+        </form>
 
-      <form action="/play-friend" method="GET" style="width: 100%; text-align: center;">
-        <button type="submit">Play a Friend (Password Protected)</button>
-      </form>
+        <form action="/play-friend" method="GET" style="width: 100%; text-align: center;">
+          <button type="submit" class="secondary">👥 Play a Friend</button>
+        </form>
+      </div>
+
+      <div class="game-info">
+        <p>🎯 <strong>Quick Match:</strong> Join the queue for instant matchmaking</p>
+        <p>⚡ Fast-paced games with 1-minute timers per player</p>
+        <p>🏆 Compete for the highest ELO rating on the leaderboard</p>
+        <p>👥 <strong>Private Games:</strong> Play against friends with password protection</p>
+      </div>
+
+      <div class="logout-section">
+        <form action="/logout" method="GET">
+          <button type="submit">Log Out</button>
+        </form>
+      </div>
     </div>
 
     <div class="leaderboard">
-      <h2>Leaderboard</h2>
-      <p>Coming soon...</p>
+      <h2>🏆 Leaderboard</h2>
+      
+      <% if (leaderboard) { %>
+        <!-- General Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number"><%= leaderboard.totalGames %></div>
+            <div class="stat-label">Total Games</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number"><%= leaderboard.activePlayersCount %></div>
+            <div class="stat-label">Active Players</div>
+          </div>
+        </div>
+
+        <!-- Top Rated Players -->
+        <div class="leaderboard-section">
+          <h3>⭐ Top Rated Players</h3>
+          <ul class="leaderboard-list">
+            <% leaderboard.topRated.forEach((player, index) => { %>
+              <li class="leaderboard-item">
+                <span class="player-rank <%= index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '' %>">
+                  <%= index + 1 %>
+                </span>
+                <div class="player-info">
+                  <div class="player-name"><%= player.name %></div>
+                </div>
+                <div class="player-value"><%= player.rating %></div>
+              </li>
+            <% }) %>
+            <% if (leaderboard.topRated.length === 0) { %>
+              <li class="leaderboard-item">
+                <div class="player-info">No rated games yet</div>
+              </li>
+            <% } %>
+          </ul>
+        </div>
+
+        <!-- Most Active Players -->
+        <div class="leaderboard-section">
+          <h3>🎯 Most Active Players</h3>
+          <ul class="leaderboard-list">
+            <% leaderboard.topGameCounts.forEach((player, index) => { %>
+              <li class="leaderboard-item">
+                <span class="player-rank <%= index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '' %>">
+                  <%= index + 1 %>
+                </span>
+                <div class="player-info">
+                  <div class="player-name"><%= player.name %></div>
+                  <div class="player-stats">
+                    <%= player.wins %>W - <%= player.losses %>L (<%=player.winRate %>%)
+                  </div>
+                </div>
+                <div class="player-value"><%= player.games %></div>
+              </li>
+            <% }) %>
+            <% if (leaderboard.topGameCounts.length === 0) { %>
+              <li class="leaderboard-item">
+                <div class="player-info">No games played yet</div>
+              </li>
+            <% } %>
+          </ul>
+        </div>
+
+        <!-- Best Win Rates -->
+        <% if (leaderboard.topWinRates && leaderboard.topWinRates.length > 0) { %>
+        <div class="leaderboard-section">
+          <h3>🔥 Best Win Rates (3+ games)</h3>
+          <ul class="leaderboard-list">
+            <% leaderboard.topWinRates.forEach((player, index) => { %>
+              <li class="leaderboard-item">
+                <span class="player-rank <%= index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '' %>">
+                  <%= index + 1 %>
+                </span>
+                <div class="player-info">
+                  <div class="player-name"><%= player.name %></div>
+                  <div class="player-stats"><%= player.games %> games</div>
+                </div>
+                <div class="player-value"><%= player.winRate %>%</div>
+              </li>
+            <% }) %>
+          </ul>
+        </div>
+        <% } %>
+
+        <!-- Recent Games -->
+        <div class="leaderboard-section">
+          <h3>⚡ Recent Games</h3>
+          <div class="recent-games">
+            <% leaderboard.recentGames.forEach((game) => { %>
+              <div class="recent-game">
+                <div class="game-result">
+                  <span class="game-players"><%= game.playerX %> vs <%= game.playerO %></span>
+                  <span class="winner">
+                    <%= game.winner === 'Draw' ? 'Draw' : game.winner + ' won' %>
+                  </span>
+                </div>
+              </div>
+            <% }) %>
+            <% if (leaderboard.recentGames.length === 0) { %>
+              <div class="recent-game">No recent games</div>
+            <% } %>
+          </div>
+        </div>
+
+      <% } else { %>
+        <div class="error-message">
+          Unable to load leaderboard data
+        </div>
+      <% } %>
     </div>
-  </main>
+  </div>
 </body>
 </html>

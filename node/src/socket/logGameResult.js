@@ -4,50 +4,112 @@ const supabase = require('../supabase/supabaseClient');
 // ELO calculation constant
 const K = 32; // adjust for faster/slower rating changes
 
+const isDev = process.env.NODE_ENV === 'development';
+
 function calculateElo(playerRating, opponentRating, score) {
   const expected = 1 / (1 + Math.pow(10, (opponentRating - playerRating) / 400));
   return Math.round(playerRating + K * (score - expected));
 }
 
 /**
+ * Get the actual users.id and rating
+ */
+async function getUserId(playerId) {
+  if (!playerId) return null;
+
+  // Handle guest players
+  if (typeof playerId === 'string' && playerId.startsWith('guest_')) {
+    return null; // Don't log guest games
+  }
+
+  // Extract the numeric ID from playerId format
+  let userId;
+  if (typeof playerId === 'string' && playerId.startsWith('google_')) {
+    userId = parseInt(playerId.replace('google_', ''), 10);
+  } else if (typeof playerId === 'number') {
+    // Handle case where winner ID was converted to number
+    userId = playerId;
+  } else {
+    console.error('Unknown playerId format:', playerId, 'Expected google_X format or number');
+    return null;
+  }
+
+  // Look up user by id (primary key)
+  const { data: existingUser, error: selectError } = await supabase
+    .from('users')
+    .select('id, rating')
+    .eq('id', userId)
+    .single();
+
+  if (selectError) {
+    if (selectError.code === 'PGRST116') {
+      console.log(`No user found with id: ${userId}`);
+    } else {
+      console.error('Error looking up user by id:', userId, selectError);
+    }
+    return null;
+  }
+
+  return existingUser;
+}
+
+/**
  * Log a game and update player ratings
  * @param {Object} game - game object from socket.js
- * @param {string|null} winnerId - playerId of winner, null if draw
+ * @param {string|number|null} winnerId - playerId of winner, null if draw
  */
 async function logGameResult(game, winnerId) {
   try {
-    const playerXId = game.players[0].playerId;
-    const playerOId = game.players[1].playerId;
+    console.log('Logging game result. Original player IDs:', {
+      player1: game.players[0].playerId,
+      player2: game.players[1].playerId,
+      winner: winnerId
+    });
+
+    // Get actual user database IDs
+    const playerX = await getUserId(game.players[0].playerId);
+    const playerO = await getUserId(game.players[1].playerId);
+    const winner = winnerId ? await getUserId(winnerId) : null;
+
+    console.log('Resolved users:', {
+      playerX: playerX?.id,
+      playerO: playerO?.id,
+      winner: winner?.id
+    });
+
+    // Skip logging if any player is missing (guest or lookup failed)
+    if (!playerX || !playerO) {
+      console.log('Skipping game log - could not resolve all players');
+      return;
+    }
 
     // 1️⃣ Insert game record
-    await supabase.from('games').insert([{
-      player_x_id: playerXId,
-      player_o_id: playerOId,
-      winner_id: winnerId,
+    const gameInsert = await supabase.from('games').insert([{
+      player_x_id: playerX.id,
+      player_o_id: playerO.id,
+      winner_id: winner?.id || null,
       state: JSON.stringify(game.state.board)
     }]);
 
-    // 2️⃣ Fetch current ratings
-    const { data: players, error: playersError } = await supabase
-      .from('users')
-      .select('id,rating')
-      .in('id', [playerXId, playerOId]);
+    if (gameInsert.error) {
+      console.error('Error inserting game record:', gameInsert.error);
+      return;
+    }
 
-    if (playersError) throw playersError;
+    console.log('Game record inserted successfully');
 
-    const playerX = players.find(p => p.id === playerXId);
-    const playerO = players.find(p => p.id === playerOId);
-
-    // Default rating if not set
+    // 2️⃣ Calculate new ratings using the data we already have
     const ratingX = playerX.rating || 1000;
     const ratingO = playerO.rating || 1000;
 
+    console.log('Current ratings:', { playerX: ratingX, playerO: ratingO });
+
     // 3️⃣ Calculate new ratings
     let scoreX, scoreO;
-    if (!winnerId) {
+    if (!winner) {
       scoreX = 0.5;
       scoreO = 0.5;
-    } else if (winnerId === playerXId) {
+    } else if (winner.id === playerX.id) {
       scoreX = 1;
       scoreO = 0;
     } else {
@@ -58,11 +120,16 @@ async function logGameResult(game, winnerId) {
     const newRatingX = calculateElo(ratingX, ratingO, scoreX);
     const newRatingO = calculateElo(ratingO, ratingX, scoreO);
 
-    // 4️⃣ Update user ratings
-    await supabase.from('users').update({ rating: newRatingX }).eq('id', playerXId);
-    await supabase.from('users').update({ rating: newRatingO }).eq('id', playerOId);
+    console.log('New ratings calculated:', { newRatingX, newRatingO });
 
-    console.log(`Game logged. New ratings: ${playerXId}=${newRatingX}, ${playerOId}=${newRatingO}`);
+    // 4️⃣ Update user ratings
+    const updateX = await supabase.from('users').update({ rating: newRatingX }).eq('id', playerX.id);
+    const updateO = await supabase.from('users').update({ rating: newRatingO }).eq('id', playerO.id);
+
+    if (updateX.error) console.error('Error updating player X rating:', updateX.error);
+    if (updateO.error) console.error('Error updating player O rating:', updateO.error);
+
+    console.log(`Game logged successfully. New ratings: ${playerX.id}=${newRatingX}, ${playerO.id}=${newRatingO}`);
   } catch (err) {
     console.error('Error logging game result:', err);
   }

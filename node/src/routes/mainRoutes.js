@@ -39,15 +39,30 @@ router.get('/', (req, res) => {
 });
 
 // Home page - shows after login or guest
-router.get('/home', ensureGuestOrLoggedIn, (req, res) => {
+router.get('/home', ensureGuestOrLoggedIn, async (req, res) => {
   console.log('GET /home', {
     isAuthenticated: req.isAuthenticated(),
     guest: req.session.guest
   });
-  res.render('home', {
-    user: req.user,
-    guest: req.session.guest
-  });
+
+  try {
+    // Fetch leaderboard data
+    const leaderboardData = await getLeaderboardData();
+    
+    res.render('home', {
+      user: req.user,
+      guest: req.session.guest,
+      leaderboard: leaderboardData
+    });
+  } catch (error) {
+    console.error('Error fetching leaderboard data:', error);
+    // Render without leaderboard data if there's an error
+    res.render('home', {
+      user: req.user,
+      guest: req.session.guest,
+      leaderboard: null
+    });
+  }
 });
 
 // Guest route
@@ -230,6 +245,146 @@ router.get("/logout", (req, res) => {
     });
   });
 });
+
+// Helper method for fetching leaderboard data
+// More efficient leaderboard data fetching
+async function getLeaderboardData() {
+  const supabase = require('../supabase/supabaseClient');
+
+  try {
+    // 1. Top 5 players by rating
+    const { data: topRated, error: ratingError } = await supabase
+      .from('users')
+      .select('id, name, rating')
+      .order('rating', { ascending: false })
+      .limit(5);
+
+    if (ratingError) throw ratingError;
+
+    // 2. Get all games to calculate statistics
+    const { data: allGames, error: gamesError } = await supabase
+      .from('games')
+      .select('player_x_id, player_o_id, winner_id, created_at');
+
+    if (gamesError) throw gamesError;
+
+    // 3. Get all users for name mapping
+    const { data: allUsers, error: usersError } = await supabase
+      .from('users')
+      .select('id, name');
+
+    if (usersError) throw usersError;
+
+    // Create user name mapping
+    const userMap = {};
+    allUsers.forEach(user => {
+      userMap[user.id] = user.name;
+    });
+
+    // Calculate game statistics
+    const playerStats = {};
+    
+    allGames.forEach(game => {
+      // Count games for player X
+      if (!playerStats[game.player_x_id]) {
+        playerStats[game.player_x_id] = { 
+          games: 0, 
+          wins: 0, 
+          name: userMap[game.player_x_id] || 'Unknown'
+        };
+      }
+      playerStats[game.player_x_id].games++;
+      
+      // Count games for player O
+      if (!playerStats[game.player_o_id]) {
+        playerStats[game.player_o_id] = { 
+          games: 0, 
+          wins: 0, 
+          name: userMap[game.player_o_id] || 'Unknown'
+        };
+      }
+      playerStats[game.player_o_id].games++;
+
+      // Count wins
+      if (game.winner_id) {
+        if (!playerStats[game.winner_id]) {
+          playerStats[game.winner_id] = { 
+            games: 0, 
+            wins: 0, 
+            name: userMap[game.winner_id] || 'Unknown'
+          };
+        }
+        playerStats[game.winner_id].wins++;
+      }
+    });
+
+    // Calculate win rates and sort
+    Object.keys(playerStats).forEach(playerId => {
+      const stats = playerStats[playerId];
+      stats.winRate = stats.games > 0 ? (stats.wins / stats.games * 100).toFixed(1) : 0;
+      stats.losses = stats.games - stats.wins;
+    });
+
+    // Top 5 by games played
+    const topGameCounts = Object.entries(playerStats)
+      .sort((a, b) => b[1].games - a[1].games)
+      .slice(0, 5)
+      .map(([id, stats]) => ({
+        id,
+        name: stats.name,
+        games: stats.games,
+        wins: stats.wins,
+        losses: stats.losses,
+        winRate: stats.winRate
+      }));
+
+    // Top 5 by win rate (minimum 3 games)
+    const topWinRates = Object.entries(playerStats)
+      .filter(([id, stats]) => stats.games >= 3)
+      .sort((a, b) => parseFloat(b[1].winRate) - parseFloat(a[1].winRate))
+      .slice(0, 5)
+      .map(([id, stats]) => ({
+        id,
+        name: stats.name,
+        games: stats.games,
+        wins: stats.wins,
+        winRate: stats.winRate
+      }));
+
+    // Recent games with proper names
+    const recentGames = allGames
+      .slice(-5)
+      .reverse()
+      .map(game => ({
+        playerX: userMap[game.player_x_id] || 'Unknown',
+        playerO: userMap[game.player_o_id] || 'Unknown',
+        winner: game.winner_id ? userMap[game.winner_id] : 'Draw',
+        createdAt: game.created_at
+      }));
+
+    return {
+      topRated: topRated || [],
+      topGameCounts: topGameCounts || [],
+      topWinRates: topWinRates || [],
+      recentGames: recentGames || [],
+      totalGames: allGames.length,
+      totalUsers: allUsers.length,
+      activePlayersCount: Object.keys(playerStats).length
+    };
+
+  } catch (error) {
+    console.error('Error in getLeaderboardData:', error);
+    return {
+      topRated: [],
+      topGameCounts: [],
+      topWinRates: [],
+      recentGames: [],
+      totalGames: 0,
+      totalUsers: 0,
+      activePlayersCount: 0
+    };
+  }
+}
 
 // Export
 module.exports = router;

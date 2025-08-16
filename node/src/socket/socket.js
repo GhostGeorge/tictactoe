@@ -18,14 +18,15 @@ module.exports = function(io) {
   io.on('connection', (socket) => {
     console.log(`🔌 New client connected: ${socket.id}`);
 
-    // --- queue handling (unchanged logic, just kept here) ---
+    // --- queue handling (FIXED: consistent string ID handling) ---
     socket.on('joinQueue', (data) => {
       let { playerId, isGuest } = data || {};
       console.log('Received joinQueue from', socket.id, 'playerId:', playerId, 'guest:', isGuest);
 
       if (isDev) {
-        playerId = Math.floor(Math.random() * 1e12); // random large number
-        console.log(`Development mode: assigned random playerId ${playerId} for socket ${socket.id}`);
+        // In development mode, keep the original playerId format (google_1, google_2, etc.)
+        // Don't generate random IDs as they won't match existing users
+        console.log(`Development mode: using original playerId ${playerId} for socket ${socket.id}`);
       } else if (!playerId) {
         io.to(socket.id).emit('queueError', { message: 'Missing playerId' });
         return;
@@ -188,8 +189,8 @@ module.exports = function(io) {
 
       if (moveResult.finished) {
         handleGameEnd(game, moveResult);
-        // Log the game result
-        const winnerId = moveResult.winner || null; // null if draw
+        // Log the game result - convert string playerId to number for database
+        const winnerId = moveResult.winner ? convertPlayerIdToNumber(moveResult.winner) : null;
         logGameResult(game, winnerId);
       }
     });
@@ -249,6 +250,10 @@ module.exports = function(io) {
                       });
                     }
                   });
+
+                  // Log the game result - convert string playerId to number for database
+                  const winnerId = convertPlayerIdToNumber(winner.playerId);
+                  logGameResult(currentGame, winnerId);
 
                   // clear monitor and remove game
                   if (gameTimers.has(gameId)) {
@@ -316,8 +321,9 @@ module.exports = function(io) {
           console.log(`⏰ Player ${currentPlayerId} timed out in game ${gameId}`);
           handleGameTimeout(game, currentPlayerId);
 
-          //Log the game result
-          logGameResult(game, game.state.winner); // winner will be set in timeout handler
+          //Log the game result - convert string playerId to number for database
+          const winnerId = convertPlayerIdToNumber(game.state.winner);
+          logGameResult(game, winnerId);
 
           // stop monitor for this game (handleGameTimeout will clear interval & remove game)
           if (gameTimers.has(gameId)) {
@@ -400,6 +406,33 @@ module.exports = function(io) {
         if (!cell) return null;
         return convertPlayerIdToSymbol(game, cell);
       });
+    }
+
+    // NEW: Convert string playerId to number for database logging
+    function convertPlayerIdToNumber(playerId) {
+      if (!playerId) return null;
+      
+      // Handle development mode numeric strings
+      if (/^\d+$/.test(playerId)) {
+        return parseInt(playerId, 10);
+      }
+      
+      // Handle google_X format
+      if (playerId.startsWith('google_')) {
+        const numericPart = playerId.replace('google_', '');
+        return parseInt(numericPart, 10);
+      }
+      
+      // Handle guest_X format or fallback
+      if (playerId.startsWith('guest_')) {
+        // For guest players, we might need a different approach
+        // For now, return null since guests might not be stored in the users table
+        return null;
+      }
+      
+      // Fallback: try to parse as number
+      const parsed = parseInt(playerId, 10);
+      return isNaN(parsed) ? null : parsed;
     }
 
     // sendBoardUpdate: sends base timers (server stored) and currentPlayerTimer computed on-the-fly

@@ -3,25 +3,104 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Welcome</title>
+  <title>Welcome - Tic Tac Toe</title>
   <style>
-    button {
-      padding: 12px 24px;
-      margin: 10px;
-      font-size: 16px;
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+      margin: 0;
+    }
+
+    .welcome-container {
+      max-width: 500px;
+      margin: 50px auto;
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .logo {
+      width: 100px;
+      height: 100px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 2rem;
+    }
+
+    .description {
+      color: #666;
+      font-size: 1rem;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+
+    .auth-buttons {
+      margin-bottom: 20px;
+    }
+
+    .auth-buttons button {
+      width: 100%;
+      max-width: 250px;
+      margin: 10px 0;
+      padding: 15px;
+      font-size: 1rem;
       cursor: pointer;
+      border-radius: 5px;
+      border: 2px solid #007bff;
+      background: #007bff;
+      color: white;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+
+    .auth-buttons button:hover {
+      background: #0056b3;
+      border-color: #0056b3;
+    }
+
+    .auth-buttons button.guest {
+      background: white;
+      color: #007bff;
+      border: 2px solid #007bff;
+    }
+
+    .auth-buttons button.guest:hover {
+      background: #007bff;
+      color: white;
     }
   </style>
 </head>
 <body>
-  <h1>Welcome to Tic Tac Toe!</h1>
+  <div class="welcome-container">
+    <!-- Logo -->
+    <img src="/images/icon.png" alt="Neoturk Logo" class="logo">
+    <!-- Title -->
+    <h1>Welcome to Tic Tac Toe!</h1>
 
-  <a href="/auth/google">
-    <button>Log in with Google</button>
-  </a>
+    <!-- Description / Project Info -->
+    <div class="description">
+      <p>Welcome to Tic Tac Toe, a fast-paced online game where strategy and quick thinking win the day!</p>
+      <p>Our project name represents fun, competition, and a simple yet timeless classic game.</p>
+      <!-- You can replace this text with anything you like -->
+    </div>
 
-  <form action="/guest" method="POST" style="display: inline;">
-    <button type="submit">Continue as Guest</button>
-  </form>
+    <!-- Login / Guest Buttons -->
+    <div class="auth-buttons">
+      <a href="/auth/google">
+        <button type="button">Log in with Google</button>
+      </a>
+
+      <form action="/guest" method="POST" style="display: inline;">
+        <button type="submit" class="guest">Continue as Guest</button>
+      </form>
+    </div>
+  </div>
 </body>
 </html>
