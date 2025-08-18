@@ -10,8 +10,6 @@ Live game state updates via WebSockets (Socket.io)
 
 Responsive EJS views for gameplay and queue status
 
-Clean project structure with modular routes, controllers, and middlewares
-
 Environment-configured for development and production
 
 Docker-ready for easy deployment
@@ -25,69 +23,26 @@ Optional: Docker & Docker Compose for containerized deployment
 
 Installation and Setup
 1. Clone the repository
-bash
-Copy
-Edit
-git clone https://github.com/JacobMS2020/node-express-webserver-template.git
-cd node-express-webserver-template
-2. Create .env file
-In the root folder (same level as server.js), create a .env file with these variables:
+2. Create .env file in project root
 
-env
-Copy
-Edit
-SESSION_KEY=your_session_secret_key_here
-NODE_ENV=development  # or 'production'
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
-GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
-Make sure to replace placeholders with your actual keys.
+.env template
+#Server required environment variables
+SESSION_KEY=
+NODE_ENV=development/production
+EXPRESS_PORT=
+SESSION_SECRET=
+
+#Google Auth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+#Supabase Auth
+SUPABASE_URL=
+SUPABASE_DB_URL=
+SUPABASE_SERVICE_KEY=
+SUPABASE_PASSWORD=
 
 Running the Server
-Using Node.js
-bash
-Copy
-Edit
-npm install
+cd node
 node server.js
-Then open your browser at http://localhost:3000
-
-Using Docker (optional)
-Make sure Docker is installed and running.
-
-bash
-Copy
-Edit
-sudo docker compose up -d
-Open your browser at http://localhost:3000
-
-Project Structure Overview
-bash
-Copy
-Edit
-node/
-├── server.js               # Entry point to start the app
-├── app.js                  # Express app setup and middleware
-├── .env                    # Environment variables
-├── public/                 # Static assets (CSS, images, error pages)
-│   ├── styles/
-│   │   └── main.css
-│   ├── 404.html
-│   └── 500.html
-├── src/
-│   ├── controllers/        # Controller logic for routes
-│   │   └── indexController.js
-│   ├── middlewares/        # Custom middleware (logging, error handling, auth protection)
-│   │   ├── errorHandler.js
-│   │   └── logger.js
-│   ├── routes/             # Express routes
-│   │   └── mainRoutes.js
-├── views/                  # EJS view templates
-│   └── index.ejs
-How to Play
-Visit the landing page and login via Google or choose to play as a guest
-
-Join the ranked queue or play with a friend via provided options
-
-Once matched, play Tic-Tac-Toe in real-time against your opponent
-
-The board updates live, and you receive game results instantly
+(make sure to port foward the express port)
