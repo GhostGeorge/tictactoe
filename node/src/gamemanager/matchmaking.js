@@ -1,4 +1,5 @@
-// src/gamemanager/matchmaking.js
+// src/gamemanager/matchmaking.js - Updated to include player names and guest status
+
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -6,14 +7,20 @@ const { v4: uuidv4 } = require('uuid');
  * For production move to persistent store.
  */
 
-const queue = []; // array of socket.id entries: { socketId, playerId, isGuest, joinedAt }
+const queue = []; // array of socket.id entries: { socketId, playerId, isGuest, joinedAt, displayName }
 const activeGames = new Map(); // gameId => game object
 
-function enqueuePlayer({ socketId, playerId, isGuest }) {
+function enqueuePlayer({ socketId, playerId, isGuest, displayName }) {
   // prevent duplicate
   if (queue.find(p => p.playerId === playerId || p.socketId === socketId)) return null;
 
-  const player = { socketId, playerId, isGuest: !!isGuest, joinedAt: Date.now() };
+  const player = { 
+    socketId, 
+    playerId, 
+    isGuest: !!isGuest, 
+    displayName: displayName || (isGuest ? 'Guest' : 'Unknown'),
+    joinedAt: Date.now() 
+  };
   queue.push(player);
 
   // if at least two players, match the oldest two (FIFO)
@@ -38,8 +45,10 @@ function removeFromQueueBySocket(socketId) {
 function createGame(gameId, p1, p2, password = null) {
   const game = {
     id: gameId,
-    players: [p1, p2], // objects with socketId, playerId, isGuest
+    players: [p1, p2], // objects with socketId, playerId, isGuest, displayName
     password: password || null,
+    hasGuest: p1.isGuest || p2.isGuest, // Track if game has guest
+    isRated: !(p1.isGuest || p2.isGuest), // Game is rated only if no guests
     state: {
       board: Array(9).fill(null), // 0..8 cells
       turn: p1.playerId, // p1 starts (X player)
@@ -56,8 +65,9 @@ function createGame(gameId, p1, p2, password = null) {
   };
   
   console.log(`Created game ${gameId} with players:`, {
-    player1: { id: p1.playerId, socket: p1.socketId },
-    player2: { id: p2.playerId, socket: p2.socketId }
+    player1: { id: p1.playerId, socket: p1.socketId, name: p1.displayName, guest: p1.isGuest },
+    player2: { id: p2.playerId, socket: p2.socketId, name: p2.displayName, guest: p2.isGuest },
+    isRated: game.isRated
   });
   
   return game;
@@ -166,9 +176,13 @@ function getGameStats() {
       id: gameId,
       status: game.state.status,
       turn: game.state.turn,
+      isRated: game.isRated,
+      hasGuest: game.hasGuest,
       players: game.players.map(p => ({
         id: p.playerId,
         socket: p.socketId,
+        name: p.displayName,
+        guest: p.isGuest,
         disconnected: p.disconnected || false
       })),
       createdAt: new Date(game.createdAt).toISOString(),

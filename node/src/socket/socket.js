@@ -7,6 +7,7 @@ const {
   getAllGames
 } = require('../gamemanager/matchmaking');
 const { logGameResult } = require('./logGameResult');
+const supabase = require('../supabase/supabaseClient');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -19,9 +20,9 @@ module.exports = function(io) {
     console.log(`🔌 New client connected: ${socket.id}`);
 
     // --- queue handling (FIXED: consistent string ID handling) ---
-    socket.on('joinQueue', (data) => {
-      let { playerId, isGuest } = data || {};
-      console.log('Received joinQueue from', socket.id, 'playerId:', playerId, 'guest:', isGuest);
+    socket.on('joinQueue', async (data) => {
+      let { playerId, isGuest, displayName } = data || {};
+      console.log('Received joinQueue from', socket.id, 'playerId:', playerId, 'guest:', isGuest, 'displayName:', displayName);
 
       if (isDev) {
         // In development mode, keep the original playerId format (google_1, google_2, etc.)
@@ -32,7 +33,32 @@ module.exports = function(io) {
         return;
       }
 
-      const result = enqueuePlayer({ socketId: socket.id, playerId, isGuest });
+      // If displayName not provided, try to fetch it
+      if (!displayName) {
+        if (isGuest || (typeof playerId === 'string' && playerId.startsWith('guest_'))) {
+          displayName = 'Guest';
+        } else {
+          // Try to get name from database
+          try {
+            const numericId = playerId.startsWith('google_') 
+              ? parseInt(playerId.replace('google_', ''), 10)
+              : parseInt(playerId, 10);
+            
+            const { data: user } = await supabase
+              .from('users')
+              .select('name')
+              .eq('id', numericId)
+              .single();
+            
+            displayName = user?.name || 'Unknown';
+          } catch (error) {
+            console.error('Error fetching user name for queue:', error);
+            displayName = 'Unknown';
+          }
+        }
+      }
+
+      const result = enqueuePlayer({ socketId: socket.id, playerId, isGuest, displayName });
       if (!result) {
         io.to(socket.id).emit('queueError', { message: 'Already in queue' });
         return;
@@ -58,13 +84,18 @@ module.exports = function(io) {
 
         players.forEach((player, idx) => {
           const symbol = idx === 0 ? 'X' : 'O';
+          const opponent = players[idx === 0 ? 1 : 0];
+          
           console.log(`Sending matchFound to ${player.socketId}: symbol=${symbol}, gameId=${gameId}, playerId=${player.playerId}`);
 
           io.to(player.socketId).emit('matchFound', {
             gameId,
             symbol,
             playerId: player.playerId,
-            playerIndex: idx
+            playerIndex: idx,
+            opponentName: opponent.displayName,
+            hasGuest: game.hasGuest,
+            isRated: game.isRated
           });
 
           // send initial board state
@@ -77,7 +108,7 @@ module.exports = function(io) {
     });
 
     // --- join existing game (reconnect or direct navigate) ---
-    socket.on('joinGame', ({ gameId, playerId }) => {
+    socket.on('joinGame', async ({ gameId, playerId }) => {
       console.log(`🎮 Player ${playerId} trying to join game ${gameId} with socket ${socket.id}`);
 
       const game = getGame(gameId);
@@ -107,20 +138,28 @@ module.exports = function(io) {
       if (!gameTimers.has(gameId)) startGameTimer(gameId);
 
       const symbol = playerIndex === 0 ? 'X' : 'O';
+      const opponent = game.players[playerIndex === 0 ? 1 : 0];
+      
+      // Get opponent name
+      let opponentName = opponent.displayName || 'Unknown';
+
       io.to(socket.id).emit('matchFound', {
         gameId,
         symbol,
         playerId,
-        playerIndex
+        playerIndex,
+        opponentName: opponentName,
+        hasGuest: game.hasGuest,
+        isRated: game.isRated
       });
 
       // send current state to reconnected player
       sendBoardUpdate(game, socket.id);
 
       // notify opponent
-      const opponent = game.players.find(p => p.playerId !== playerId && !p.disconnected);
-      if (opponent) {
-        io.to(opponent.socketId).emit('opponentReconnected');
+      const connectedOpponent = game.players.find(p => p.playerId !== playerId && !p.disconnected);
+      if (connectedOpponent) {
+        io.to(connectedOpponent.socketId).emit('opponentReconnected');
       }
 
       // clear any disconnect timeout for this player

@@ -1,4 +1,4 @@
-// gameLogger.js
+// src/socket/logGameResult.js - Updated to properly handle guest games
 const supabase = require('../supabase/supabaseClient');
 
 // ELO calculation constant
@@ -60,11 +60,20 @@ async function getUserId(playerId) {
  */
 async function logGameResult(game, winnerId) {
   try {
-    console.log('Logging game result. Original player IDs:', {
+    console.log('Logging game result. Game info:', {
+      gameId: game.id,
+      hasGuest: game.hasGuest,
+      isRated: game.isRated,
       player1: game.players[0].playerId,
       player2: game.players[1].playerId,
       winner: winnerId
     });
+
+    // Skip logging if game has guests (not rated)
+    if (game.hasGuest || !game.isRated) {
+      console.log('Skipping game log - game includes guest player(s) and is not rated');
+      return;
+    }
 
     // Get actual user database IDs
     const playerX = await getUserId(game.players[0].playerId);
@@ -129,7 +138,7 @@ async function logGameResult(game, winnerId) {
     if (updateX.error) console.error('Error updating player X rating:', updateX.error);
     if (updateO.error) console.error('Error updating player O rating:', updateO.error);
 
-    console.log(`Game logged successfully. New ratings: ${playerX.id}=${newRatingX}, ${playerO.id}=${newRatingO}`);
+    console.log(`Rated game logged successfully. New ratings: ${playerX.id}=${newRatingX}, ${playerO.id}=${newRatingO}`);
   } catch (err) {
     console.error('Error logging game result:', err);
   }

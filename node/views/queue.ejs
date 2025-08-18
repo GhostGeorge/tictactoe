@@ -33,6 +33,27 @@
       font-family: monospace;
     }
     
+    .rating-info {
+      background: #e9ecef;
+      padding: 12px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      border-left: 4px solid #007bff;
+    }
+    
+    .rating-info.guest {
+      background: #fff3cd;
+      border-left-color: #ffc107;
+      color: #856404;
+    }
+    
+    .rating-info.rated {
+      background: #d4edda;
+      border-left-color: #28a745;
+      color: #155724;
+    }
+    
     #status {
       font-size: 1.2rem;
       font-weight: bold;
@@ -138,8 +159,17 @@
     <h1>Matchmaking Queue</h1>
     
     <div class="player-info">
-      <strong>Player ID:</strong> <%= playerId %><br>
+      <strong>Player:</strong> <%= playerName %><br>
+      <strong>ID:</strong> <%= playerId %><br>
       <strong>Type:</strong> <%= guest ? 'Guest' : 'Google Account' %>
+    </div>
+    
+    <div class="rating-info <%= guest ? 'guest' : 'rated' %>">
+      <% if (guest) { %>
+        ⚠️ <strong>Guest Mode:</strong> Games played as a guest will not affect your rating or appear in statistics.
+      <% } else { %>
+        🏆 <strong>Rated Games:</strong> Your ELO rating will be affected by wins and losses in this match!
+      <% } %>
     </div>
     
     <div id="status" class="status-connecting">
@@ -151,6 +181,9 @@
       <p>🎮 Waiting for another player to join the queue</p>
       <p>⚡ Games are fast-paced with 1-minute timers per player</p>
       <p>🏆 First to get 3 in a row wins!</p>
+      <% if (!guest) { %>
+        <p>📊 Your rating will be updated based on the match result</p>
+      <% } %>
     </div>
     
     <div style="margin-top: 30px;">
@@ -162,13 +195,13 @@
   <script src="/socket.io/socket.io.js"></script>
 
   <script id="server-data" type="application/json">
-    <%- JSON.stringify({ playerId, guest }) %>
+    <%- JSON.stringify({ playerId, playerName, guest }) %>
   </script>
 
   <script>
     // Parse server data safely from the script tag
     const serverData = JSON.parse(document.getElementById('server-data').textContent);
-    const { playerId, guest: isGuest } = serverData;
+    const { playerId, playerName, guest: isGuest } = serverData;
 
     const socket = io();
     const statusEl = document.getElementById('status');
@@ -178,7 +211,7 @@
     let isConnected = false;
     let hasJoinedQueue = false;
 
-    console.log('Queue page loaded. PlayerID:', playerId, 'Guest:', isGuest);
+    console.log('Queue page loaded. PlayerID:', playerId, 'Name:', playerName, 'Guest:', isGuest);
 
     function updateStatus(message, className = 'status-connecting', showSpinner = false) {
       statusEl.className = `status-${className}`;
@@ -201,8 +234,8 @@
 
       // Small delay to ensure connection is stable
       setTimeout(() => {
-        console.log('Emitting joinQueue with:', { playerId, isGuest });
-        socket.emit('joinQueue', { playerId, isGuest });
+        console.log('Emitting joinQueue with:', { playerId, playerName, isGuest });
+        socket.emit('joinQueue', { playerId, displayName: playerName, isGuest });
         hasJoinedQueue = true;
       }, 100);
     });
@@ -231,15 +264,19 @@
       if (message.includes('Already in queue') && isConnected) {
         setTimeout(() => {
           console.log('Retrying queue join...');
-          socket.emit('joinQueue', { playerId, isGuest });
+          socket.emit('joinQueue', { playerId, displayName: playerName, isGuest });
         }, 2000);
       }
     });
 
-    socket.on('matchFound', ({ gameId, symbol, playerId: gamePlayerId }) => {
-      console.log('Match found!', { gameId, symbol, gamePlayerId });
+    socket.on('matchFound', ({ gameId, symbol, playerId: gamePlayerId, opponentName, hasGuest, isRated }) => {
+      console.log('Match found!', { gameId, symbol, gamePlayerId, opponentName, hasGuest, isRated });
+      
+      const ratingText = isRated ? '(Rated Game)' : '(Unrated - Guest Player Present)';
       updateStatus(
-        `Match found! You are ${symbol}<br><small>Redirecting to game...</small>`, 
+        `Match found! You are ${symbol}<br>
+         <small>vs ${opponentName} ${ratingText}<br>
+         Redirecting to game...</small>`, 
         'found'
       );
 
@@ -248,7 +285,7 @@
         const redirectPlayerId = gamePlayerId || playerId;
         console.log('Redirecting to game with playerId:', redirectPlayerId);
         window.location.href = `/game/${gameId}?playerId=${encodeURIComponent(redirectPlayerId)}`;
-      }, 1500);
+      }, 2000);
     });
 
     // Handle page visibility changes to rejoin queue if needed
@@ -256,7 +293,7 @@
       if (!document.hidden && isConnected && !hasJoinedQueue) {
         console.log('Page became visible, rejoining queue...');
         setTimeout(() => {
-          socket.emit('joinQueue', { playerId, isGuest });
+          socket.emit('joinQueue', { playerId, displayName: playerName, isGuest });
           hasJoinedQueue = true;
         }, 500);
       }

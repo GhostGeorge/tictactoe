@@ -77,28 +77,31 @@ router.post('/guest', (req, res) => {
   });
 });
 
-// Game routes
+// Game routes - Updated queue route to include player name
 router.get('/queue', ensureGuestOrLoggedIn, (req, res) => {
   // Generate consistent player ID based on authentication status
-  let playerId;
+  let playerId, playerName;
   if (req.user && req.user.id) {
     playerId = `google_${req.user.id}`;
+    playerName = req.user.name || 'Unknown User';
   } else {
     playerId = `guest_${req.sessionID}`;
+    playerName = 'Guest';
   }
   
   const guest = req.session.guest === true;
   
   // Store player info in session for consistency
   req.session.playerId = playerId;
+  req.session.playerName = playerName;
   req.session.isGuest = guest;
   
-  console.log(`Queue route: playerId=${playerId}, guest=${guest}, sessionID=${req.sessionID}`);
+  console.log(`Queue route: playerId=${playerId}, name=${playerName}, guest=${guest}, sessionID=${req.sessionID}`);
   
-  res.render('queue', { playerId, guest });
+  res.render('queue', { playerId, playerName, guest });
 });
 
-// Game page route
+// Game page route - Updated to pass player name
 router.get('/game/:gameId', ensureGuestOrLoggedIn, (req, res) => {
   const gameId = req.params.gameId;
   const game = getGame(gameId);
@@ -108,23 +111,37 @@ router.get('/game/:gameId', ensureGuestOrLoggedIn, (req, res) => {
     return res.redirect('/home?error=game_not_found');
   }
 
-  // Determine player ID consistently
-  let playerId;
+  // Determine player ID and name consistently
+  let playerId, playerName;
   if (req.query.playerId) {
     // Use query parameter if provided (from queue redirect)
     playerId = req.query.playerId;
+    // Try to get name from session or derive it
+    if (req.session.playerName) {
+      playerName = req.session.playerName;
+    } else if (req.user && req.user.name) {
+      playerName = req.user.name;
+    } else if (playerId.startsWith('guest_')) {
+      playerName = 'Guest';
+    } else {
+      playerName = 'Unknown';
+    }
   } else if (req.user && req.user.id) {
     // Generate from Google auth
     playerId = `google_${req.user.id}`;
+    playerName = req.user.name || 'Unknown User';
   } else {
     // Generate from session ID for guests
     playerId = `guest_${req.sessionID}`;
+    playerName = 'Guest';
   }
   
-  console.log(`Game route: gameId=${gameId}, playerId=${playerId}, sessionID=${req.sessionID}`);
+  console.log(`Game route: gameId=${gameId}, playerId=${playerId}, name=${playerName}, sessionID=${req.sessionID}`);
   console.log(`Game players:`, game.players.map(p => ({ 
     playerId: p.playerId, 
     socketId: p.socketId,
+    displayName: p.displayName,
+    isGuest: p.isGuest,
     disconnected: p.disconnected || false
   })));
 
@@ -140,10 +157,12 @@ router.get('/game/:gameId', ensureGuestOrLoggedIn, (req, res) => {
   // Store current game info in session
   req.session.currentGameId = gameId;
   req.session.currentPlayerId = playerId;
+  req.session.currentPlayerName = playerName;
 
   res.render('game', {
     gameId,
     playerId,
+    playerName,
     guest: req.session.guest || false,
   });
 });
