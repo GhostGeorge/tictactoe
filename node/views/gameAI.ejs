@@ -54,6 +54,82 @@
       background: #e7f3ff !important;
       border-color: #007bff !important;
     }
+
+    .game-actions {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .game-actions .btn {
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+      transition: all 0.3s ease;
+      min-width: 140px;
+    }
+
+    .game-actions .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .btn-primary {
+      background: #007bff;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #0056b3;
+    }
+
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #1e7e34;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #545b62;
+    }
+
+    /* Responsive design for mobile */
+    @media (max-width: 768px) {
+      .game-actions {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .game-actions .btn {
+        min-width: 200px;
+        padding: 14px 20px;
+        font-size: 16px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .game-actions .btn {
+        min-width: 180px;
+        padding: 12px 16px;
+        font-size: 14px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -118,9 +194,10 @@
       </div>
     </div>
 
-    <div class="game-actions" style="display: none;">
-      <button id="newAIGameButton" class="btn btn-primary" onclick="window.location.href='/play-ai'">New AI Game</button>
-      <button id="newGameButton" class="btn btn-secondary" onclick="window.location.href='/home'">Back to Home</button>
+    <div class="game-actions">
+      <button id="newAIGameButton" class="btn btn-primary" style="display: none;" onclick="window.location.href='/play-ai'">New AI Game</button>
+      <button id="queueNewGameButton" class="btn btn-success" style="display: none;" onclick="window.location.href='/queue'">Queue New Game</button>
+      <button id="newGameButton" class="btn btn-secondary" style="display: none;" onclick="window.location.href='/home'">Return Home</button>
     </div>
   </div>
 
@@ -161,9 +238,13 @@
     const xTimerContainer = document.getElementById("playerXTimer");
     const oTimerContainer = document.getElementById("playerOTimer");
     const newAIGameButton = document.getElementById("newAIGameButton");
+    const queueNewGameButton = document.getElementById("queueNewGameButton");
     const newGameButton = document.getElementById("newGameButton");
 
     console.log('AI Game page loaded. GameID:', gameId, 'PlayerID:', playerId, 'Difficulty:', difficulty);
+
+    // Game action buttons are hidden by default (opacity: 0)
+    const gameActionsEl = document.querySelector('.game-actions');
 
     // Utility functions
     function formatTime(ms) {
@@ -195,6 +276,12 @@
 
     function hideAIStatus() {
       aiStatusEl.style.display = 'none';
+    }
+
+    function showNewGameButtons() {
+      newAIGameButton.style.display = "inline-block";
+      queueNewGameButton.style.display = "inline-block";
+      newGameButton.style.display = "inline-block";
     }
 
     function updateTimerDisplaysImmediately() {
@@ -284,10 +371,7 @@
       }
     }
 
-    function showNewGameButtons() {
-      newAIGameButton.style.display = "inline-block";
-      newGameButton.style.display = "inline-block";
-    }
+
 
     // Socket handlers
     socket.on('connect', () => {
