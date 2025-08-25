@@ -4,6 +4,7 @@ const router = express.Router();
 const passport = require('passport');
 const ensureGuestOrLoggedIn = require('../middlewares/protection');
 const { enqueuePlayer, getGame, removeGame, getGameStats } = require('../gamemanager/matchmaking');
+const AIPlayer = require('../ai/openai-player');
 
 console.log("Main routes loaded");
 
@@ -167,21 +168,125 @@ router.get('/game/:gameId', ensureGuestOrLoggedIn, (req, res) => {
   });
 });
 
-// Playing a friend - redirect to password page
-router.get('/play-friend', ensureGuestOrLoggedIn, (req, res) => {
-  res.render('playFriend');
+// AI game selection page
+router.get('/play-ai', ensureGuestOrLoggedIn, (req, res) => {
+  res.render('playAI');
 });
 
-// Handle friend game creation/joining (placeholder for now)
-router.post('/play-friend', ensureGuestOrLoggedIn, (req, res) => {
-  const { gamePassword } = req.body;
+// Handle AI game creation
+router.post('/play-ai', ensureGuestOrLoggedIn, async (req, res) => {
+  const { difficulty } = req.body;
   
-  if (!gamePassword) {
-    return res.redirect('/play-friend?error=missing_password');
+  if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+    return res.redirect('/play-ai?error=invalid_difficulty');
   }
+
+  try {
+    // Generate consistent player ID and name
+    let humanPlayerId, humanPlayerName;
+    if (req.user && req.user.id) {
+      humanPlayerId = `google_${req.user.id}`;
+      humanPlayerName = req.user.name || 'Unknown User';
+    } else {
+      humanPlayerId = `guest_${req.sessionID}`;
+      humanPlayerName = 'Guest';
+    }
+
+    // Create AI player
+    const aiPlayer = new AIPlayer(difficulty);
+    
+    // Randomly decide who goes first
+    const humanGoesFirst = Math.random() < 0.5;
+    const player1 = humanGoesFirst ? 
+      { socketId: 'human_socket', playerId: humanPlayerId, isGuest: req.session.guest || false, displayName: humanPlayerName } :
+      { socketId: aiPlayer.socketId, playerId: aiPlayer.playerId, isGuest: aiPlayer.isGuest, displayName: aiPlayer.displayName };
+    
+    const player2 = humanGoesFirst ?
+      { socketId: aiPlayer.socketId, playerId: aiPlayer.playerId, isGuest: aiPlayer.isGuest, displayName: aiPlayer.displayName } :
+      { socketId: 'human_socket', playerId: humanPlayerId, isGuest: req.session.guest || false, displayName: humanPlayerName };
+
+    // Create game using existing matchmaking system
+    const { createGame } = require('../gamemanager/matchmaking');
+    const { v4: uuidv4 } = require('uuid');
+    
+    const gameId = uuidv4();
+    const game = createGame(gameId, player1, player2);
+    
+    // Mark AI games as unrated
+    game.isRated = false;
+    game.hasGuest = true; // This will prevent rating updates
+    
+    // Store AI player instance and game info in memory (you might want to use Redis in production)
+    global.aiGames = global.aiGames || new Map();
+    global.aiGames.set(gameId, {
+      aiPlayer: aiPlayer,
+      humanPlayerId: humanPlayerId,
+      difficulty: difficulty,
+      game: game
+    });
+
+    console.log(`Created AI game ${gameId} - Human: ${humanPlayerName} (${humanPlayerId}), Difficulty: ${difficulty}, Human goes first: ${humanGoesFirst}`);
+
+    // Store game info in session
+    req.session.currentAIGameId = gameId;
+    req.session.playerId = humanPlayerId;
+    req.session.playerName = humanPlayerName;
+
+    // Redirect to AI game page
+    res.redirect(`/game-ai/${gameId}?playerId=${encodeURIComponent(humanPlayerId)}`);
+
+  } catch (error) {
+    console.error('Error creating AI game:', error);
+    res.redirect('/play-ai?error=creation_failed');
+  }
+});
+
+// AI game page (separate from multiplayer games)
+router.get('/game-ai/:gameId', ensureGuestOrLoggedIn, (req, res) => {
+  const gameId = req.params.gameId;
   
-  // TODO: Implement password-protected games
-  res.redirect('/home?message=friend_games_coming_soon');
+  // Check if AI game exists
+  global.aiGames = global.aiGames || new Map();
+  const aiGameData = global.aiGames.get(gameId);
+  
+  if (!aiGameData) {
+    console.log(`AI Game ${gameId} not found. Redirecting to home.`);
+    return res.redirect('/home?error=ai_game_not_found');
+  }
+
+  // Determine player ID consistently
+  let playerId, playerName;
+  if (req.query.playerId) {
+    playerId = req.query.playerId;
+    if (req.session.playerName) {
+      playerName = req.session.playerName;
+    } else if (req.user && req.user.name) {
+      playerName = req.user.name;
+    } else {
+      playerName = playerId.startsWith('guest_') ? 'Guest' : 'Unknown';
+    }
+  } else if (req.user && req.user.id) {
+    playerId = `google_${req.user.id}`;
+    playerName = req.user.name || 'Unknown User';
+  } else {
+    playerId = `guest_${req.sessionID}`;
+    playerName = 'Guest';
+  }
+
+  // Verify this is the correct human player
+  if (playerId !== aiGameData.humanPlayerId) {
+    console.log(`Player ${playerId} not authorized for AI game ${gameId}`);
+    return res.redirect('/home?error=not_your_ai_game');
+  }
+
+  res.render('gameAI', {
+    gameId,
+    playerId,
+    playerName,
+    difficulty: aiGameData.difficulty,
+    aiName: aiGameData.aiPlayer.displayName,
+    guest: req.session.guest || false,
+  });
 });
 
 // Google authentication routes

@@ -23,24 +23,7 @@ Optional: Docker & Docker Compose for containerized deployment
 
 Installation and Setup
 1. Clone the repository
-2. Create .env file in project root
-
-.env template
-#Server required environment variables
-SESSION_KEY=
-NODE_ENV=development/production
-EXPRESS_PORT=
-SESSION_SECRET=
-
-#Google Auth
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-
-#Supabase Auth
-SUPABASE_URL=
-SUPABASE_DB_URL=
-SUPABASE_SERVICE_KEY=
-SUPABASE_PASSWORD=
+2. Create .env file in project root using the example.env as reference
 
 Running the Server
 cd node

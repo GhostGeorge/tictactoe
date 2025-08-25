@@ -17,6 +17,7 @@
     "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
+    "openai": "^5.15.0",
     "serve-favicon": "^2.5.0",
     "uid": "^2.0.2"
   }

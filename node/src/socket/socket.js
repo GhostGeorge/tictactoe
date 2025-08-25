@@ -180,6 +180,64 @@ module.exports = function(io) {
       }
     });
 
+    // --- AI Game join handling ---
+    socket.on('joinAIGame', async ({ gameId, playerId }) => {
+      console.log(`🤖 Player ${playerId} joining AI game ${gameId} with socket ${socket.id}`);
+
+      global.aiGames = global.aiGames || new Map();
+      const aiGameData = global.aiGames.get(gameId);
+      
+      if (!aiGameData) {
+        io.to(socket.id).emit('errorMessage', 'AI Game not found');
+        return;
+      }
+
+      const game = aiGameData.game;
+      const humanPlayerId = aiGameData.humanPlayerId;
+      
+      if (playerId !== humanPlayerId) {
+        io.to(socket.id).emit('errorMessage', 'You are not authorized for this AI game');
+        return;
+      }
+
+      // Find human player in game and update socket
+      const humanPlayerIndex = game.players.findIndex(p => p.playerId === humanPlayerId);
+      if (humanPlayerIndex === -1) {
+        io.to(socket.id).emit('errorMessage', 'Player not found in AI game');
+        return;
+      }
+
+      // Update human player's socket ID
+      game.players[humanPlayerIndex].socketId = socket.id;
+      socketPlayerMap.set(socket.id, { playerId: humanPlayerId, gameId });
+
+      // Initialize timers if missing
+      if (!game.timers) initializeTimers(game);
+
+      const humanSymbol = humanPlayerIndex === 0 ? 'X' : 'O';
+      const aiPlayer = aiGameData.aiPlayer;
+
+      // Send match found to human player
+      io.to(socket.id).emit('matchFound', {
+        gameId,
+        symbol: humanSymbol,
+        playerId: humanPlayerId,
+        playerIndex: humanPlayerIndex,
+        opponentName: aiPlayer.displayName,
+        hasGuest: true, // Mark as having guest to show unrated
+        isRated: false // AI games are unrated
+      });
+
+      // Send initial board state
+      sendBoardUpdate(game, socket.id);
+
+      // If it's AI's turn, trigger AI move
+      if (game.state.turn === aiPlayer.playerId && game.state.status === 'playing') {
+        console.log(`It's AI's turn in game ${gameId}`);
+        handleAITurn(gameId);
+      }
+    });
+
     // --- make move from client ---
     socket.on('makeMove', ({ gameId, index }) => {
       console.log(`Move attempt: gameId=${gameId}, index=${index}, socket=${socket.id}`);
@@ -234,14 +292,102 @@ module.exports = function(io) {
       }
     });
 
+    // --- AI move handling ---
+    socket.on('makeAIMove', ({ gameId, index }) => {
+      console.log(`AI Move attempt: gameId=${gameId}, index=${index}, socket=${socket.id}`);
+
+      global.aiGames = global.aiGames || new Map();
+      const aiGameData = global.aiGames.get(gameId);
+      
+      if (!aiGameData) {
+        io.to(socket.id).emit('errorMessage', 'AI Game not found');
+        return;
+      }
+
+      const game = aiGameData.game;
+      const humanPlayerId = aiGameData.humanPlayerId;
+      
+      // Verify this is the human player
+      const humanPlayer = game.players.find(p => p.playerId === humanPlayerId);
+      if (!humanPlayer || humanPlayer.socketId !== socket.id) {
+        io.to(socket.id).emit('errorMessage', 'Not authorized for this move');
+        return;
+      }
+
+      if (game.state.turn !== humanPlayerId) {
+        io.to(socket.id).emit('errorMessage', 'Not your turn');
+        return;
+      }
+
+      // Calculate elapsed time for human player's turn
+      if (game.timers && game.turnStartTime) {
+        const elapsed = Date.now() - game.turnStartTime;
+        game.timers[humanPlayerId] = Math.max(0, (game.timers[humanPlayerId] || 0) - elapsed);
+      }
+
+      // Make the move using existing game logic
+      const moveResult = makeMove(gameId, humanPlayerId, index);
+      if (!moveResult.ok) {
+        io.to(socket.id).emit('errorMessage', moveResult.reason);
+        return;
+      }
+
+      // Update turn start time
+      if (game.state.status === 'playing' && !moveResult.finished) {
+        game.turnStartTime = Date.now();
+      }
+
+      // Send board update to human player
+      sendBoardUpdate(game, socket.id);
+
+      if (moveResult.finished) {
+        // Game ended
+        handleGameEnd(game, moveResult);
+        // Log the game result - convert string playerId to number for database
+        const winnerId = moveResult.winner ? convertPlayerIdToNumber(moveResult.winner) : null;
+        logGameResult(game, winnerId);
+        // Clean up AI game
+        global.aiGames.delete(gameId);
+      } else {
+        // It's now AI's turn
+        const aiPlayer = aiGameData.aiPlayer;
+        if (game.state.turn === aiPlayer.playerId) {
+          console.log(`Triggering AI turn in game ${gameId}`);
+          handleAITurn(gameId);
+        }
+      }
+    });
+
     // --- disconnect handling ---
     socket.on('disconnect', () => {
       console.log(`❌ Client disconnected: ${socket.id}`);
       const mapping = socketPlayerMap.get(socket.id);
       if (mapping) {
         const { playerId, gameId } = mapping;
+        
+        // Check if this is an AI game
+        global.aiGames = global.aiGames || new Map();
+        const aiGameData = global.aiGames.get(gameId);
+        
+        if (aiGameData) {
+          // This is an AI game - clean it up immediately
+          console.log(`Cleaning up AI game ${gameId} after human disconnect`);
+          const game = getGame(gameId);
+          if (game) {
+            // Stop any running timers
+            if (gameTimers.has(gameId)) {
+              clearInterval(gameTimers.get(gameId));
+              gameTimers.delete(gameId);
+            }
+            removeGame(gameId);
+          }
+          global.aiGames.delete(gameId);
+          socketPlayerMap.delete(socket.id);
+          return;
+        }
+        
+        // Regular multiplayer game disconnect handling
         const game = getGame(gameId);
-
         if (game && game.state.status === 'playing') {
           const player = game.players.find(p => p.playerId === playerId);
           if (player) {
@@ -316,7 +462,118 @@ module.exports = function(io) {
       removeFromQueueBySocket(socket.id);
     });
 
-    // ---------- helper functions ----------
+    // ---------- AI helper functions ----------
+    
+    // Helper function to handle AI turns
+    async function handleAITurn(gameId) {
+      global.aiGames = global.aiGames || new Map();
+      const aiGameData = global.aiGames.get(gameId);
+      
+      if (!aiGameData) return;
+
+      const game = aiGameData.game;
+      const aiPlayer = aiGameData.aiPlayer;
+      const humanPlayerId = aiGameData.humanPlayerId;
+
+      if (game.state.status !== 'playing' || game.state.turn !== aiPlayer.playerId) {
+        return;
+      }
+
+      console.log(`AI is thinking in game ${gameId}...`);
+
+      // Notify human player that AI is thinking
+      const humanPlayer = game.players.find(p => p.playerId === humanPlayerId);
+      if (humanPlayer && !humanPlayer.disconnected) {
+        io.to(humanPlayer.socketId).emit('aiThinking', { message: `${aiPlayer.displayName} is thinking...` });
+      }
+
+      try {
+        // Determine AI symbol
+        const aiPlayerIndex = game.players.findIndex(p => p.playerId === aiPlayer.playerId);
+        const aiSymbol = aiPlayerIndex === 0 ? 'X' : 'O';
+
+        // Get AI move with simulated thinking delay
+        aiPlayer.makeDelayedMove(game.state.board, aiSymbol, async (move) => {
+          // Check if game is still active
+          const currentGame = getGame(gameId);
+          if (!currentGame || currentGame.state.status !== 'playing' || currentGame.state.turn !== aiPlayer.playerId) {
+            console.log(`AI move cancelled - game state changed for ${gameId}`);
+            return;
+          }
+
+          if (move === null) {
+            console.log(`AI couldn't make a move in game ${gameId}`);
+            return;
+          }
+
+          console.log(`AI chose position ${move} in game ${gameId}`);
+
+          // Calculate elapsed time for AI's turn
+          if (currentGame.timers && currentGame.turnStartTime) {
+            const elapsed = Date.now() - currentGame.turnStartTime;
+            currentGame.timers[aiPlayer.playerId] = Math.max(0, (currentGame.timers[aiPlayer.playerId] || 0) - elapsed);
+          }
+
+          // Make AI move using existing game logic
+          const moveResult = makeMove(gameId, aiPlayer.playerId, move);
+          if (!moveResult.ok) {
+            console.error(`AI move failed in game ${gameId}:`, moveResult.reason);
+            return;
+          }
+
+          // Update turn start time for next player
+          if (currentGame.state.status === 'playing' && !moveResult.finished) {
+            currentGame.turnStartTime = Date.now();
+          }
+
+          // Send board update to human player
+          if (humanPlayer && !humanPlayer.disconnected) {
+            sendBoardUpdate(currentGame, humanPlayer.socketId);
+            
+            // Clear AI thinking message
+            io.to(humanPlayer.socketId).emit('aiMoveComplete', { 
+              move: move,
+              message: `${aiPlayer.displayName} chose position ${move}`
+            });
+          }
+
+          if (moveResult.finished) {
+            // Game ended
+            handleGameEnd(currentGame, moveResult);
+            // Log the game result
+            const winnerId = moveResult.winner ? convertPlayerIdToNumber(moveResult.winner) : null;
+            logGameResult(currentGame, winnerId);
+            // Clean up AI game
+            global.aiGames.delete(gameId);
+          }
+        });
+
+      } catch (error) {
+        console.error(`Error in AI turn for game ${gameId}:`, error);
+        
+        // Fallback: make random move
+        const availableMoves = game.state.board
+          .map((cell, index) => cell === null ? index : null)
+          .filter(index => index !== null);
+        
+        if (availableMoves.length > 0) {
+          const randomMove = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+          
+          // Small delay then make the random move
+          setTimeout(() => {
+            const currentGame = getGame(gameId);
+            if (currentGame && currentGame.state.status === 'playing') {
+              const moveResult = makeMove(gameId, aiPlayer.playerId, randomMove);
+              if (moveResult.ok && humanPlayer && !humanPlayer.disconnected) {
+                sendBoardUpdate(currentGame, humanPlayer.socketId);
+              }
+            }
+          }, 1000);
+        }
+      }
+    }
+
+    // ---------- existing helper functions ----------
 
     function initializeTimers(game) {
       // Start each player with 60k ms (1 minute) unless game already defines them
@@ -447,7 +704,7 @@ module.exports = function(io) {
       });
     }
 
-    // NEW: Convert string playerId to number for database logging
+    // Convert string playerId to number for database logging
     function convertPlayerIdToNumber(playerId) {
       if (!playerId) return null;
       

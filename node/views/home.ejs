@@ -84,6 +84,18 @@
         color: white;
       }
 
+.game-buttons button.ai-button {
+  border-color: #6f42c1;
+  color: #6f42c1;
+  background: white;
+}
+
+.game-buttons button.ai-button:hover {
+  background: #6f42c1;
+  color: white;
+  box-shadow: 0 4px 8px rgba(111, 66, 193, 0.3);
+}
+
       .logout-section {
         margin-top: 30px;
         padding-top: 20px;
@@ -469,23 +481,14 @@
         </div>
 
         <div class="game-buttons">
-          <form
-            action="/queue"
-            method="GET"
-            style="width: 100%; text-align: center"
-          >
-            <button type="submit">🚀 Enter Queue (Rated Game)</button>
-          </form>
+  <form action="/queue" method="GET" style="width: 100%; text-align: center">
+    <button type="submit">🚀 Enter Queue (Rated Game)</button>
+  </form>
 
-          <!--<form action="/play-friend" method="GET" style="width: 100%; text-align: center;">
-          <button type="submit" class="secondary">👥 Play Open AI</button>
-        </form> -->
-          <form>
-            <button type="submit" class="secondary">
-              👥 Play Open AI (Coming soon)
-            </button>
-          </form>
-        </div>
+  <form action="/play-ai" method="GET" style="width: 100%; text-align: center;">
+    <button type="submit" class="ai-button">🤖 Challenge AI (GPT-4)</button>
+  </form>
+</div>
 
         <div class="game-info">
           <p>

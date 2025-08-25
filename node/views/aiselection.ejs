@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Play AI - Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+      margin: 0;
+    }
+
+    .ai-container {
+      max-width: 600px;
+      margin: 50px auto;
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 2.5rem;
+    }
+
+    .ai-description {
+      color: #666;
+      font-size: 1.1rem;
+      margin-bottom: 30px;
+      line-height: 1.6;
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      border-left: 4px solid #007bff;
+    }
+
+    .difficulty-selection {
+      margin: 30px 0;
+    }
+
+    .difficulty-title {
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .difficulty-options {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .difficulty-card {
+      background: white;
+      border: 2px solid #dee2e6;
+      border-radius: 10px;
+      padding: 20px;
+      width: 150px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .difficulty-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    .difficulty-card.selected {
+      border-color: #007bff;
+      background: #e7f3ff;
+      transform: translateY(-5px);
+      box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+    }
+
+    .difficulty-card input[type="radio"] {
+      display: none;
+    }
+
+    .difficulty-emoji {
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+
+    .difficulty-name {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .difficulty-description {
+      font-size: 0.9rem;
+      color: #666;
+      line-height: 1.4;
+    }
+
+    .easy { border-left-color: #28a745; }
+    .medium { border-left-color: #ffc107; }
+    .hard { border-left-color: #dc3545; }
+
+    .start-game-section {
+      margin-top: 40px;
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1.2rem;
+      font-weight: bold;
+      transition: all 0.3s;
+      margin: 10px;
+    }
+
+    button:hover:not(:disabled) {
+      background: #0056b3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,123,255,0.3);
+    }
+
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .back-button {
+      background: #6c757d;
+    }
+
+    .back-button:hover {
+      background: #5a6268;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      border: 1px solid #f5c6cb;
+    }
+
+    .info-section {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+      border: 1px solid #c3e6cb;
+    }
+
+    @media (max-width: 768px) {
+      .difficulty-options {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .difficulty-card {
+        width: 200px;
+      }
+      
+      .ai-container {
+        margin: 20px auto;
+        padding: 20px;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="ai-container">
+    <h1>🤖 Play Against AI</h1>
+
+    <div class="ai-description">
+      <strong>Challenge ChatGPT-4 in Tic Tac Toe!</strong><br>
+      Our AI opponent uses OpenAI's language model to make strategic decisions. 
+      Choose your difficulty level and test your skills against artificial intelligence.
+      <br><br>
+      <em>Note: AI games are unrated and will NOT affect your ELO score. Play freely to practice and have fun!</em>
+    </div>
+
+    <!-- Error message if any -->
+    <% if (typeof query !== 'undefined' && query.error) { %>
+      <div class="error-message">
+        <% if (query.error === 'invalid_difficulty') { %>
+          Please select a valid difficulty level.
+        <% } else if (query.error === 'creation_failed') { %>
+          Failed to create AI game. Please try again.
+        <% } else { %>
+          An error occurred. Please try again.
+        <% } %>
+      </div>
+    <% } %>
+
+    <form action="/play-ai" method="POST">
+      <div class="difficulty-selection">
+        <div class="difficulty-title">Select Difficulty Level:</div>
+        
+        <div class="difficulty-options">
+          <label class="difficulty-card easy" for="easy">
+            <input type="radio" name="difficulty" value="easy" id="easy" required>
+            <div class="difficulty-emoji">😊</div>
+            <div class="difficulty-name">Easy</div>
+            <div class="difficulty-description">
+              Casual play, makes some mistakes. Good for beginners or relaxed games.
+            </div>
+          </label>
+
+          <label class="difficulty-card medium" for="medium">
+            <input type="radio" name="difficulty" value="medium" id="medium" required>
+            <div class="difficulty-emoji">🤔</div>
+            <div class="difficulty-name">Medium</div>
+            <div class="difficulty-description">
+              Competent player, blocks obvious moves but can make strategic errors.
+            </div>
+          </label>
+
+          <label class="difficulty-card hard" for="hard">
+            <input type="radio" name="difficulty" value="hard" id="hard" required>
+            <div class="difficulty-emoji">🧠</div>
+            <div class="difficulty-name">Hard</div>
+            <div class="difficulty-description">
+              Expert level AI using optimal strategy. Very challenging to beat!
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="info-section">
+        🎯 <strong>Practice Mode:</strong> This AI match will NOT count towards your ELO rating!<br>
+        ⚡ <strong>Timer:</strong> Both you and the AI have 60 seconds per turn<br>
+        🤖 <strong>Fair Play:</strong> The AI thinks in real-time, just like a human opponent
+      </div>
+
+      <div class="start-game-section">
+        <button type="submit" id="startGameBtn" disabled>Start AI Game</button>
+        <button type="button" class="back-button" onclick="window.location.href='/home'">
+          Back to Home
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Handle difficulty selection
+    const difficultyCards = document.querySelectorAll('.difficulty-card');
+    const radioInputs = document.querySelectorAll('input[name="difficulty"]');
+    const startGameBtn = document.getElementById('startGameBtn');
+
+    // Add click listeners to cards
+    difficultyCards.forEach(card => {
+      card.addEventListener('click', () => {
+        // Remove selected class from all cards
+        difficultyCards.forEach(c => c.classList.remove('selected'));
+        // Add selected class to clicked card
+        card.classList.add('selected');
+        // Check the radio button
+        const radio = card.querySelector('input[type="radio"]');
+        radio.checked = true;
+        // Enable start button
+        startGameBtn.disabled = false;
+      });
+    });
+
+    // Handle radio button changes (for keyboard navigation)
+    radioInputs.forEach(radio => {
+      radio.addEventListener('change', () => {
+        difficultyCards.forEach(c => c.classList.remove('selected'));
+        const selectedCard = document.querySelector(`label[for="${radio.id}"]`);
+        selectedCard.classList.add('selected');
+        startGameBtn.disabled = false;
+      });
+    });
+
+    // Form submission handler
+    document.querySelector('form').addEventListener('submit', (e) => {
+      startGameBtn.disabled = true;
+      startGameBtn.textContent = 'Creating AI Game...';
+    });
+  </script>
+</body>
+</html>
