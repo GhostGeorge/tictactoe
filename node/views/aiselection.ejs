@@ -14,126 +14,129 @@
     }
 
     .ai-container {
-      max-width: 600px;
-      margin: 50px auto;
-      background: white;
-      padding: 40px;
+      max-width: 500px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 30px;
       border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
     h1 {
       color: #333;
       margin-bottom: 20px;
-      font-size: 2.5rem;
+      font-size: 2rem;
     }
 
     .ai-description {
-      color: #666;
-      font-size: 1.1rem;
-      margin-bottom: 30px;
-      line-height: 1.6;
       background: #f8f9fa;
-      padding: 20px;
-      border-radius: 8px;
+      padding: 15px;
+      border-radius: 5px;
       border-left: 4px solid #007bff;
+      color: #555;
+      margin-bottom: 20px;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 12px;
+      border-radius: 5px;
+      border: 1px solid #f5c6cb;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
     }
 
     .difficulty-selection {
-      margin: 30px 0;
+      margin: 25px 0;
     }
 
     .difficulty-title {
-      font-size: 1.3rem;
       font-weight: bold;
+      margin-bottom: 15px;
+      font-size: 1.1rem;
       color: #333;
-      margin-bottom: 20px;
     }
 
     .difficulty-options {
-      display: flex;
+      display: grid;
       gap: 15px;
-      justify-content: center;
-      flex-wrap: wrap;
     }
 
     .difficulty-card {
-      background: white;
+      background: #fff;
       border: 2px solid #dee2e6;
       border-radius: 10px;
-      padding: 20px;
-      width: 150px;
+      padding: 15px;
       cursor: pointer;
-      transition: all 0.3s ease;
-      position: relative;
+      transition: all 0.2s;
     }
 
     .difficulty-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      transform: translateY(-3px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
 
     .difficulty-card.selected {
       border-color: #007bff;
       background: #e7f3ff;
-      transform: translateY(-5px);
-      box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+      box-shadow: 0 4px 10px rgba(0, 123, 255, 0.2);
     }
 
-    .difficulty-card input[type="radio"] {
+    .difficulty-card input {
       display: none;
     }
 
     .difficulty-emoji {
-      font-size: 2rem;
-      margin-bottom: 10px;
+      font-size: 1.8rem;
+      margin-bottom: 5px;
     }
 
     .difficulty-name {
-      font-size: 1.1rem;
       font-weight: bold;
       color: #333;
-      margin-bottom: 8px;
+      margin-bottom: 5px;
     }
 
     .difficulty-description {
-      font-size: 0.9rem;
       color: #666;
+      font-size: 0.85rem;
       line-height: 1.4;
     }
 
-    .easy { border-left-color: #28a745; }
-    .medium { border-left-color: #ffc107; }
-    .hard { border-left-color: #dc3545; }
-
-    .start-game-section {
-      margin-top: 40px;
+    .info-section {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      padding: 12px;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      color: #155724;
+      margin: 20px 0;
+      line-height: 1.4;
     }
 
     button {
       background: #007bff;
-      color: white;
+      color: #fff;
       border: none;
-      padding: 15px 30px;
+      padding: 12px 25px;
       border-radius: 5px;
       cursor: pointer;
-      font-size: 1.2rem;
-      font-weight: bold;
-      transition: all 0.3s;
-      margin: 10px;
+      font-size: 1rem;
+      margin: 5px;
+      transition: background-color 0.2s, transform 0.2s;
     }
 
     button:hover:not(:disabled) {
       background: #0056b3;
       transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,123,255,0.3);
     }
 
     button:disabled {
       background: #6c757d;
       cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
     }
 
     .back-button {
@@ -144,41 +147,10 @@
       background: #5a6268;
     }
 
-    .error-message {
-      background: #f8d7da;
-      color: #721c24;
-      padding: 15px;
-      border-radius: 5px;
-      margin-bottom: 20px;
-      border: 1px solid #f5c6cb;
-    }
-
-    .info-section {
-      background: #d4edda;
-      color: #155724;
-      padding: 15px;
-      border-radius: 5px;
-      margin: 20px 0;
-      border: 1px solid #c3e6cb;
-    }
-
-    @media (max-width: 768px) {
-      .difficulty-options {
-        flex-direction: column;
-        align-items: center;
-      }
-      
-      .difficulty-card {
-        width: 200px;
-      }
-      
+    @media (max-width: 500px) {
       .ai-container {
         margin: 20px auto;
         padding: 20px;
-      }
-      
-      h1 {
-        font-size: 2rem;
       }
     }
   </style>
@@ -188,14 +160,11 @@
     <h1>🤖 Play Against AI</h1>
 
     <div class="ai-description">
-      <strong>Challenge ChatGPT-4 in Tic Tac Toe!</strong><br>
-      Our AI opponent uses OpenAI's language model to make strategic decisions. 
-      Choose your difficulty level and test your skills against artificial intelligence.
-      <br><br>
-      <em>Note: AI games are unrated and will NOT affect your ELO score. Play freely to practice and have fun!</em>
+      <strong>Challenge ChatGPT-4 in Tic Tac Toe!</strong><!--<br>
+      Choose a difficulty and test your skills against AI.<br><br>
+      <em>AI games are unrated and won’t affect your ELO score.</em>-->
     </div>
 
-    <!-- Error message if any -->
     <% if (typeof locals.query !== 'undefined' && locals.query && locals.query.error) { %>
       <div class="error-message">
         <% if (locals.query.error === 'invalid_difficulty') { %>
@@ -210,15 +179,15 @@
 
     <form action="/play-ai" method="POST">
       <div class="difficulty-selection">
-        <div class="difficulty-title">Select Difficulty Level:</div>
-        
+        <div class="difficulty-title">Select Difficulty Level</div>
+
         <div class="difficulty-options">
           <label class="difficulty-card easy" for="easy">
             <input type="radio" name="difficulty" value="easy" id="easy" required>
             <div class="difficulty-emoji">😊</div>
             <div class="difficulty-name">Easy</div>
             <div class="difficulty-description">
-              Casual play, makes some mistakes. Good for beginners or relaxed games.
+              Casual play, makes some mistakes. Good for beginners.
             </div>
           </label>
 
@@ -227,7 +196,7 @@
             <div class="difficulty-emoji">🤔</div>
             <div class="difficulty-name">Medium</div>
             <div class="difficulty-description">
-              Competent player, blocks obvious moves but can make strategic errors.
+              Competent play. Blocks obvious moves but not flawless.
             </div>
           </label>
 
@@ -236,19 +205,19 @@
             <div class="difficulty-emoji">🧠</div>
             <div class="difficulty-name">Hard</div>
             <div class="difficulty-description">
-              Expert level AI using optimal strategy. Very challenging to beat!
+              Expert AI using optimal strategies. Tough challenge!
             </div>
           </label>
         </div>
       </div>
 
       <div class="info-section">
-        🎯 <strong>Practice Mode:</strong> This AI match will NOT count towards your ELO rating!<br>
-        ⚡ <strong>Timer:</strong> Both you and the AI have 60 seconds per turn<br>
-        🤖 <strong>Fair Play:</strong> The AI thinks in real-time, just like a human opponent
+        🎯 Practice mode: No ELO rating changes<br>
+        ⚡ 60s per move<br>
+        🤖 AI thinks in real time
       </div>
 
-      <div class="start-game-section">
+      <div>
         <button type="submit" id="startGameBtn" disabled>Start AI Game</button>
         <button type="button" class="back-button" onclick="window.location.href='/home'">
           Back to Home
@@ -258,49 +227,34 @@
   </div>
 
   <script>
-    // Handle difficulty selection
     const difficultyCards = document.querySelectorAll('.difficulty-card');
     const radioInputs = document.querySelectorAll('input[name="difficulty"]');
     const startGameBtn = document.getElementById('startGameBtn');
 
-    // Add click listeners to cards
     difficultyCards.forEach(card => {
       card.addEventListener('click', () => {
-        // Remove selected class from all cards
         difficultyCards.forEach(c => c.classList.remove('selected'));
-        // Add selected class to clicked card
         card.classList.add('selected');
-        // Check the radio button
-        const radio = card.querySelector('input[type="radio"]');
-        radio.checked = true;
-        // Enable start button
+        card.querySelector('input').checked = true;
         startGameBtn.disabled = false;
       });
     });
 
-    // Handle radio button changes (for keyboard navigation)
     radioInputs.forEach(radio => {
       radio.addEventListener('change', () => {
         difficultyCards.forEach(c => c.classList.remove('selected'));
-        const selectedCard = document.querySelector(`label[for="${radio.id}"]`);
-        selectedCard.classList.add('selected');
+        document.querySelector(`label[for="${radio.id}"]`).classList.add('selected');
         startGameBtn.disabled = false;
       });
     });
 
-    // Form submission handler
     document.querySelector('form').addEventListener('submit', (e) => {
-      const selectedDifficulty = document.querySelector('input[name="difficulty"]:checked');
-      
-      if (!selectedDifficulty) {
+      const selected = document.querySelector('input[name="difficulty"]:checked');
+      if (!selected) {
         e.preventDefault();
-        alert('Please select a difficulty level before starting the game.');
+        alert('Please select a difficulty.');
         return;
       }
-      
-      console.log('Submitting form with difficulty:', selectedDifficulty.value);
-      console.log('Form data:', new FormData(e.target));
-      
       startGameBtn.disabled = true;
       startGameBtn.textContent = 'Creating AI Game...';
     });
