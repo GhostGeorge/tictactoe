@@ -1,466 +1,749 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Game - Tic Tac Toe</title>
-    <link rel="stylesheet" href="/styles/index.css" />
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        background: #f8f9fa;
-        margin: 0;
-        padding: 0;
-      }
-      .container {
-        max-width: 600px;
-        margin: 30px auto;
-        padding: 20px;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      }
-      .game-header {
-        text-align: center;
-        margin-bottom: 20px;
-      }
-      .connection-status.connected {
-        color: #28a745;
-      }
-      .connection-status.disconnected {
-        color: #dc3545;
-      }
-      .game-board {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 5px;
-        margin: 20px 0;
-      }
-      .cell {
-        width: 100px;
-        height: 100px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 2rem;
-        cursor: pointer;
-        background: #fff;
-        border: 2px solid #dee2e6;
-        transition: background 0.2s;
-      }
-      .cell.taken {
-        cursor: not-allowed;
-      }
-      .cell:hover {
-        background: #e9ecef;
-      }
-      .ai-status {
-        margin: 10px 0;
-        padding: 10px;
-        border-radius: 8px;
-        font-weight: bold;
-        transition: all 0.3s ease;
-        min-height: 24px;
-      }
-      .ai-thinking {
-        background: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
-      }
-      .ai-complete {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-      }
-      .difficulty-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 0.8rem;
-        font-weight: bold;
-        margin-left: 10px;
-      }
-      .difficulty-easy {
-        background: #d4edda;
-        color: #155724;
-      }
-      .difficulty-medium {
-        background: #fff3cd;
-        color: #856404;
-      }
-      .difficulty-hard {
-        background: #f8d7da;
-        color: #721c24;
-      }
-      .ai-active {
-        background: #e7f3ff !important;
-        border-color: #007bff !important;
-      }
-      .timer-section {
-        display: flex;
-        justify-content: space-around;
-        margin: 20px 0;
-      }
-      .player-timer {
-        text-align: center;
-      }
-      .active {
-        font-weight: bold;
-      }
-      .warning {
-        color: #dc3545;
-      }
-      .game-actions {
-        display: flex;
-        justify-content: center;
-        gap: 15px;
-        margin-top: 20px;
-        flex-wrap: wrap;
-      }
-      .btn {
-        padding: 12px 24px;
-        font-size: 16px;
-        border-radius: 8px;
-        border: none;
-        cursor: pointer;
-        text-decoration: none;
-        text-align: center;
-        transition: all 0.3s ease;
-        min-width: 140px;
-      }
-      .btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      }
-      .btn-primary {
-        background: #007bff;
-        color: white;
-      }
-      .btn-primary:hover {
-        background: #0056b3;
-      }
-      .btn-success {
-        background: #28a745;
-        color: white;
-      }
-      .btn-success:hover {
-        background: #1e7e34;
-      }
-      .btn-secondary {
-        background: #6c757d;
-        color: white;
-      }
-      .btn-secondary:hover {
-        background: #545b62;
-      }
-      @media (max-width: 480px) {
-        .cell {
-          width: 80px;
-          height: 80px;
-          font-size: 1.5rem;
-        }
-        .btn {
-          min-width: 140px;
-          padding: 10px;
-          font-size: 14px;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <script id="server-data" type="application/json">
-      { "gameId": "<%= gameId %>", "playerId": "<%= playerId %>", "difficulty": "<%= difficulty %>", "aiName": "<%= aiName %>", "guest": <%= guest %> }
-    </script>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Game - Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 2px;
+      margin: 20px auto;
+      width: 304px;
+      background: #333;
+      border-radius: 8px;
+      padding: 2px;
+    }
+    
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    
+    .cell:hover:not(.taken) {
+      background: #f0f0f0;
+    }
+    
+    .cell.taken {
+      cursor: not-allowed;
+      background: #f8f9fa;
+    }
+    
+    .cell.winning {
+      background: #d4edda !important;
+      color: #155724;
+    }
+    
+    #gameStatus {
+      font-size: 1rem;
+      margin: 10px 0;
+      font-weight: bold;
+      min-height: 2rem;
+    }
+    
+    #playerSymbol {
+      font-size: 1.2rem;
+      margin: 10px 0;
+      background: #e9ecef;
+      padding: 10px;
+      border-radius: 5px;
+      display: inline-block;
+    }
+    
+    #turnIndicator {
+      font-size: 1.1rem;
+      margin: 10px 0;
+      color: #666;
+    }
 
-    <div class="container">
-      <div class="game-header">
-        <h1>AI Game</h1>
-        <div id="connectionStatus" class="connection-status">Connecting...</div>
-      </div>
+    /* Rating notification styles */
+    .rating-notification {
+      margin: 15px auto;
+      padding: 12px;
+      border-radius: 8px;
+      max-width: 500px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
 
-      <div class="game-info">
-        <div id="playerSymbol">Waiting...</div>
-        <div id="gameStatus">Connecting to AI game...</div>
-        <div id="turnIndicator">Waiting for game to start...</div>
-      </div>
+    .rating-notification .icon {
+      margin-right: 8px;
+    }
 
-      <div id="opponentInfo" style="display: none">
-        Opponent: <span id="opponentName"></span>
-        <span id="difficultyBadge" class="difficulty-badge"></span>
-      </div>
+    /* Opponent info styles */
+    .opponent-info {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px auto;
+      max-width: 400px;
+      font-size: 1rem;
+    }
 
-      <div id="aiStatus" class="ai-status"></div>
+    .opponent-name {
+      font-weight: bold;
+      color: #495057;
+      margin-bottom: 5px;
+    }
 
-      <div class="game-board" id="board">
-        <div class="cell" data-index="0"></div>
-        <div class="cell" data-index="1"></div>
-        <div class="cell" data-index="2"></div>
-        <div class="cell" data-index="3"></div>
-        <div class="cell" data-index="4"></div>
-        <div class="cell" data-index="5"></div>
-        <div class="cell" data-index="6"></div>
-        <div class="cell" data-index="7"></div>
-        <div class="cell" data-index="8"></div>
-      </div>
+    .difficulty-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-left: 10px;
+    }
 
-      <div class="timer-section">
-        <div id="playerXTimer" class="player-timer">
-          <div id="xLabel">X</div>
-          <div id="xTimeRemaining">1:00</div>
-        </div>
-        <div id="playerOTimer" class="player-timer">
-          <div id="oLabel">O</div>
-          <div id="oTimeRemaining">1:00</div>
-        </div>
-      </div>
+    .difficulty-easy {
+      background: #d4edda;
+      color: #155724;
+    }
 
-      <div class="game-actions">
-        <button
-          id="newAIGameButton"
-          class="btn btn-primary"
-          style="display: none"
-          onclick="window.location.href='/play-ai'"
-        >
-          New AI Game
-        </button>
-        <button
-          id="queueNewGameButton"
-          class="btn btn-success"
-          style="display: none"
-          onclick="window.location.href='/queue'"
-        >
-          Queue New Game
-        </button>
-        <button
-          id="newGameButton"
-          class="btn btn-secondary"
-          style="display: none"
-          onclick="window.location.href='/home'"
-        >
-          Return Home
-        </button>
+    .difficulty-medium {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .difficulty-hard {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    /* AI Thinking Animation - Fixed position to prevent jumping */
+    .ai-thinking-container {
+      position: relative;
+      min-height: 40px;
+      margin: 10px auto;
+      max-width: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ai-thinking {
+      background: #e7f3ff;
+      border: 2px solid #007bff;
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #0056b3;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .ai-thinking.hidden {
+      display: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+      }
+      50% { 
+        transform: scale(1.02);
+        box-shadow: 0 4px 16px rgba(0, 123, 255, 0.3);
+      }
+    }
+
+    .thinking-dots {
+      display: inline-flex;
+      gap: 2px;
+    }
+
+    .thinking-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #007bff;
+      animation: thinking 1.4s ease-in-out infinite both;
+    }
+
+    .thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+    .thinking-dot:nth-child(2) { animation-delay: -0.16s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0s; }
+
+    @keyframes thinking {
+      0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.5;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .timer-container {
+      display: flex;
+      justify-content: space-around;
+      margin: 10px 0 20px 0;
+      font-size: 1rem;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .timer {
+      padding: 15px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      min-width: 120px;
+      background: white;
+      transition: all 0.3s ease;
+    }
+
+    .timer.active {
+      border-color: #007bff;
+      background-color: #e7f3ff;
+      transform: scale(1.05);
+    }
+
+    .timer.active.ai-thinking {
+      border-color: #6f42c1;
+      background-color: #f3e8ff;
+      animation: aiPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes aiPulse {
+      0%, 100% { 
+        border-color: #6f42c1;
+        background-color: #f3e8ff;
+      }
+      50% { 
+        border-color: #5a2d91;
+        background-color: #e9d5ff;
+      }
+    }
+
+    .timer.warning {
+      border-color: #dc3545;
+      background-color: #f8d7da;
+      color: #721c24;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    .timer-label {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .timer-value {
+      font-size: 1.2rem;
+      font-family: monospace;
+    }
+
+    .connection-status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+
+    .connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .game-info {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px auto;
+      max-width: 500px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 5px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+
+    button.ai-button {
+      background: #6f42c1;
+    }
+
+    button.ai-button:hover {
+      background: #5a2d91;
+    }
+
+    button.queue-button {
+      background: #28a745;
+      font-weight: bold;
+    }
+
+    button.queue-button:hover {
+      background: #218838;
+    }
+
+    .button-container {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="connection-status" id="connectionStatus">Connecting...</div>
+  
+  <div class="game-info">
+    <div id="gameStatus">Connecting to AI game...</div>
+    <div id="playerSymbol">Waiting for symbol assignment...</div>
+    
+    <!-- Rating notification -->
+    <div id="ratingNotification" class="rating-notification" style="display: none;">
+      <span class="icon">⚠️</span>
+      <span id="ratingText">This game includes AI and will not affect your rating.</span>
+    </div>
+    
+    <!-- Opponent info -->
+    <div id="opponentInfo" class="opponent-info" style="display: none;">
+      <div class="opponent-name">Playing against: <span id="opponentName">Loading...</span></div>
+    </div>
+    
+    <div id="turnIndicator">Waiting for game to start...</div>
+  </div>
+
+  <!-- AI Thinking Animation - Fixed container to prevent jumping -->
+  <div class="ai-thinking-container">
+    <div id="aiThinking" class="ai-thinking hidden">
+      <span>🤖 AI is thinking</span>
+      <div class="thinking-dots">
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
       </div>
     </div>
+  </div>
+  
+  <div class="timer-container">
+    <div class="timer" id="playerXTimer">
+      <div class="timer-label" id="xLabel">Player X</div>
+      <div class="timer-value" id="xTimeRemaining">1:00</div>
+    </div>
+    <div class="timer" id="playerOTimer">
+      <div class="timer-label" id="oLabel">Player O</div>
+      <div class="timer-value" id="oTimeRemaining">1:00</div>
+    </div>
+  </div>
+  
+  <div id="board">
+    <div class="cell" data-index="0"></div>
+    <div class="cell" data-index="1"></div>
+    <div class="cell" data-index="2"></div>
+    <div class="cell" data-index="3"></div>
+    <div class="cell" data-index="4"></div>
+    <div class="cell" data-index="5"></div>
+    <div class="cell" data-index="6"></div>
+    <div class="cell" data-index="7"></div>
+    <div class="cell" data-index="8"></div>
+  </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-      const socket = io();
-      const serverData = JSON.parse(
-        document.getElementById("server-data").textContent
-      );
-      const {
-        gameId,
-        playerId,
-        difficulty,
-        aiName,
-        guest: isGuest,
-      } = serverData;
+  <div class="button-container">
+    <button onclick="window.location.href='/home'">Return Home</button>
+    <button id="newAIGameButton" class="ai-button" style="display: none;" onclick="window.location.href='/play-ai'">New AI Game</button>
+    <button id="queueNewGameButton" class="queue-button" style="display: none;" onclick="window.location.href='/queue'">Queue New Game</button>
+  </div>
 
-      let playerSymbol = null;
-      let currentTurn = null;
-      let gameActive = true;
-      let opponentAIName = aiName || "AI";
+  <script id="server-data" type="application/json">
+    <%- JSON.stringify({ gameId, playerId, difficulty, aiName, guest }) %>
+  </script>
 
-      let baseTimers = {};
-      let turnStartTime = null;
-      let currentTurnPlayerId = null;
-      let localTimerInterval = null;
-      let aiThinkingInterval = null; // for animated dots
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const serverData = JSON.parse(document.getElementById('server-data').textContent);
+    const { gameId, playerId, difficulty, aiName, guest: isGuest } = serverData;
 
-      const boardEl = document.getElementById("board");
-      const turnEl = document.getElementById("turnIndicator");
-      const symbolEl = document.getElementById("playerSymbol");
-      const gameStatusEl = document.getElementById("gameStatus");
-      const connectionStatusEl = document.getElementById("connectionStatus");
-      const opponentInfoEl = document.getElementById("opponentInfo");
-      const opponentNameEl = document.getElementById("opponentName");
-      const difficultyBadgeEl = document.getElementById("difficultyBadge");
-      const aiStatusEl = document.getElementById("aiStatus");
-      const xTimerEl = document.getElementById("xTimeRemaining");
-      const oTimerEl = document.getElementById("oTimeRemaining");
-      const xTimerContainer = document.getElementById("playerXTimer");
-      const oTimerContainer = document.getElementById("playerOTimer");
-      const newAIGameButton = document.getElementById("newAIGameButton");
-      const queueNewGameButton = document.getElementById("queueNewGameButton");
-      const newGameButton = document.getElementById("newGameButton");
+    // Game state
+    let playerSymbol = null;
+    let currentTurn = null;
+    let gameActive = true;
+    let opponentAIName = aiName || 'AI';
 
-      function formatTime(ms) {
-        const s = Math.ceil(ms / 1000);
-        return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+    // Timer state
+    let baseTimers = {};
+    let turnStartTime = null;
+    let currentTurnPlayerId = null;
+    let localTimerInterval = null;
+
+    // DOM elements
+    const boardEl = document.getElementById("board");
+    const turnEl = document.getElementById("turnIndicator");
+    const symbolEl = document.getElementById("playerSymbol");
+    const gameStatusEl = document.getElementById("gameStatus");
+    const connectionStatusEl = document.getElementById("connectionStatus");
+    const ratingNotificationEl = document.getElementById("ratingNotification");
+    const ratingTextEl = document.getElementById("ratingText");
+    const opponentInfoEl = document.getElementById("opponentInfo");
+    const opponentNameEl = document.getElementById("opponentName");
+    const aiThinkingEl = document.getElementById("aiThinking");
+    const xTimerEl = document.getElementById("xTimeRemaining");
+    const oTimerEl = document.getElementById("oTimeRemaining");
+    const xTimerContainer = document.getElementById("playerXTimer");
+    const oTimerContainer = document.getElementById("playerOTimer");
+    const newAIGameButton = document.getElementById("newAIGameButton");
+    const queueNewGameButton = document.getElementById("queueNewGameButton");
+
+    console.log('AI Game page loaded. GameID:', gameId, 'PlayerID:', playerId, 'Difficulty:', difficulty);
+
+    // ---------- utils ----------
+    function formatTime(ms) {
+      ms = Math.max(0, Math.floor(ms));
+      const totalSeconds = Math.ceil(ms / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function showAIThinking() {
+      aiThinkingEl.classList.remove('hidden');
+      // Add special styling to AI timer when thinking
+      if (currentTurn !== playerSymbol) {
+        const aiTimer = playerSymbol === 'X' ? oTimerContainer : xTimerContainer;
+        aiTimer.classList.add('ai-thinking');
       }
+    }
 
-      function showAIStatus(msg, type = "thinking") {
-        aiStatusEl.style.display = "block";
-        aiStatusEl.className = `ai-status ai-${type}`;
-        if (type === "thinking") {
-          let dots = 0;
-          aiStatusEl.textContent = `🤖 ${msg}`;
-          clearInterval(aiThinkingInterval);
-          aiThinkingInterval = setInterval(() => {
-            dots = (dots + 1) % 4;
-            aiStatusEl.textContent = `🤖 ${msg}${".".repeat(dots)}`;
-          }, 500);
-        } else {
-          clearInterval(aiThinkingInterval);
-          aiStatusEl.textContent = `🎯 ${msg}`;
-          setTimeout(() => {
-            aiStatusEl.style.display = "none";
-          }, 2000);
-        }
+    function hideAIThinking() {
+      aiThinkingEl.classList.add('hidden');
+      // Remove special styling from timers
+      xTimerContainer.classList.remove('ai-thinking');
+      oTimerContainer.classList.remove('ai-thinking');
+    }
+
+    function updateBoard(board) {
+      [...boardEl.children].forEach((cell, idx) => {
+        const value = board[idx];
+        cell.textContent = value || "";
+        cell.classList.toggle('taken', !!value);
+        cell.style.color = value === 'X' ? '#007bff' : value === 'O' ? '#dc3545' : '#000';
+      });
+    }
+
+    function updateTurnIndicator() {
+      if (!gameActive) return;
+
+      if (currentTurn === playerSymbol) {
+        turnEl.textContent = "Your turn";
+        turnEl.style.color = "#007bff";
+        turnEl.style.fontWeight = "bold";
+      } else if (currentTurn) {
+        turnEl.textContent = `${opponentAIName}'s turn`;
+        turnEl.style.color = "#6f42c1";
+        turnEl.style.fontWeight = "normal";
+      } else {
+        turnEl.textContent = "Waiting for game to start...";
+        turnEl.style.color = "#666";
+        turnEl.style.fontWeight = "normal";
       }
+    }
 
-      function hideAIStatus() {
-        aiStatusEl.style.display = "none";
-        clearInterval(aiThinkingInterval);
+    function updateTimerDisplaysImmediately() {
+      const playerIds = Object.keys(baseTimers);
+      if (playerIds.length >= 2) {
+        const p0 = baseTimers[playerIds[0]] ?? 60000;
+        const p1 = baseTimers[playerIds[1]] ?? 60000;
+        xTimerEl.textContent = formatTime(convertToMsIfNumber(p0));
+        oTimerEl.textContent = formatTime(convertToMsIfNumber(p1));
+      } else {
+        xTimerEl.textContent = formatTime(60000);
+        oTimerEl.textContent = formatTime(60000);
       }
+    }
 
-      function updateBoard(board) {
-        [...boardEl.children].forEach((cell, i) => {
-          cell.textContent = board[i] || "";
-          cell.classList.toggle("taken", !!board[i]);
-          cell.style.color =
-            board[i] === "X"
-              ? "#007bff"
-              : board[i] === "O"
-              ? "#dc3545"
-              : "#000";
-        });
-      }
+    function convertToMsIfNumber(v) {
+      return typeof v === 'number' ? v : 60000;
+    }
 
-      function updateTurnIndicator() {
-        if (!gameActive) return;
+    function startLocalCountdown() {
+      clearInterval(localTimerInterval);
+      if (!currentTurnPlayerId || !turnStartTime || !baseTimers[currentTurnPlayerId]) return;
+
+      const activePlayerId = currentTurnPlayerId;
+      const tick = () => {
+        const elapsed = Date.now() - turnStartTime;
+        const remaining = Math.max(0, baseTimers[activePlayerId] - elapsed);
+
+        const yourTimerEl = playerSymbol === 'X' ? xTimerEl : oTimerEl;
+        const opponentTimerEl = playerSymbol === 'X' ? oTimerEl : xTimerEl;
+        const yourTimerContainer = playerSymbol === 'X' ? xTimerContainer : oTimerContainer;
+        const opponentTimerContainer = playerSymbol === 'X' ? oTimerContainer : xTimerContainer;
+
         if (currentTurn === playerSymbol) {
-          turnEl.textContent = "Your turn - Click a square!";
-          turnEl.style.color = "#007bff";
-        } else if (currentTurn) {
-          turnEl.textContent = `${opponentAIName}'s turn`;
-          turnEl.style.color = "#28a745";
+          // Your turn
+          yourTimerEl.textContent = formatTime(remaining);
+          yourTimerContainer.classList.add('active');
+          yourTimerContainer.classList.toggle('warning', remaining < 10000);
+          opponentTimerContainer.classList.remove('active', 'warning');
         } else {
-          turnEl.textContent = "Waiting for game to start...";
-          turnEl.style.color = "#666";
+          // AI's turn
+          opponentTimerEl.textContent = formatTime(remaining);
+          opponentTimerContainer.classList.add('active');
+          opponentTimerContainer.classList.toggle('warning', remaining < 10000);
+          yourTimerContainer.classList.remove('active', 'warning');
+        }
+
+        if (remaining <= 0) {
+          clearInterval(localTimerInterval);
+        }
+      };
+
+      tick();
+      localTimerInterval = setInterval(tick, 100);
+    }
+
+    function stopLocalCountdown() {
+      clearInterval(localTimerInterval);
+      xTimerContainer.classList.remove('active', 'warning', 'ai-thinking');
+      oTimerContainer.classList.remove('active', 'warning', 'ai-thinking');
+    }
+
+    function showNewGameButtons() {
+      newAIGameButton.style.display = "inline-block";
+      queueNewGameButton.style.display = "inline-block";
+    }
+
+    // ---------- socket handlers ----------
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      connectionStatusEl.textContent = 'Connected';
+      connectionStatusEl.className = 'connection-status connected';
+      gameStatusEl.textContent = "Connected! Joining AI game...";
+
+      socket.emit('joinAIGame', { gameId, playerId });
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      connectionStatusEl.textContent = 'Disconnected';
+      connectionStatusEl.className = 'connection-status disconnected';
+      gameStatusEl.textContent = 'Disconnected from server. Trying to reconnect...';
+      stopLocalCountdown();
+      hideAIThinking();
+    });
+
+    socket.on('matchFound', ({ symbol, opponentName, hasGuest }) => {
+      playerSymbol = symbol;
+      symbolEl.textContent = `You are ${symbol}`;
+      gameStatusEl.textContent = "AI game started!";
+      gameActive = true;
+      
+      // Update UI elements
+      ratingNotificationEl.style.display = 'block';
+      opponentInfoEl.style.display = 'block';
+      opponentNameEl.textContent = opponentName;
+      
+      // Add difficulty badge
+      const difficultyBadge = document.createElement('span');
+      difficultyBadge.className = `difficulty-badge difficulty-${difficulty}`;
+      difficultyBadge.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+      opponentNameEl.appendChild(difficultyBadge);
+      
+      console.log('AI Match found! You are:', symbol, 'AI:', opponentName, 'Difficulty:', difficulty);
+      
+      // Set timer labels
+      if (playerSymbol === 'X') {
+        document.getElementById('xLabel').textContent = 'You';
+        document.getElementById('oLabel').textContent = opponentName || 'AI';
+      } else {
+        document.getElementById('xLabel').textContent = opponentName || 'AI';
+        document.getElementById('oLabel').textContent = 'You';
+      }
+    });
+
+    socket.on('boardUpdate', ({ board, turn, timers, currentPlayerTimer, turnStartTime: ts }) => {
+      console.log('Board update received', { board, turn, timers, currentPlayerTimer, ts });
+
+      updateBoard(board);
+      currentTurn = turn;
+      updateTurnIndicator();
+
+      if (timers) {
+        baseTimers = { ...timers };
+      }
+
+      if (ts) {
+        turnStartTime = ts;
+      } else {
+        turnStartTime = null;
+      }
+
+      const playerIds = Object.keys(baseTimers);
+      if (playerIds.length >= 2) {
+        const pidForX = playerIds[0];
+        const pidForO = playerIds[1];
+        currentTurnPlayerId = (turn === 'X') ? pidForX : pidForO;
+      } else {
+        currentTurnPlayerId = null;
+      }
+
+      updateTimerDisplaysImmediately();
+      stopLocalCountdown();
+      if (currentTurnPlayerId && turnStartTime) {
+        startLocalCountdown();
+      }
+
+      // Hide AI thinking when it's your turn
+      if (currentTurn === playerSymbol) {
+        hideAIThinking();
+      }
+    });
+
+    socket.on('aiThinking', ({ message }) => {
+      console.log('AI thinking:', message);
+      showAIThinking();
+    });
+
+    socket.on('aiMoveComplete', ({ message }) => {
+      console.log('AI move complete:', message);
+      hideAIThinking();
+    });
+
+    socket.on('gameOver', ({ winner, reason }) => {
+      console.log('Game over:', winner, reason);
+      gameActive = false;
+      stopLocalCountdown();
+      hideAIThinking();
+
+      let message = '';
+      if (winner === 'draw') {
+        message = "It's a draw! 🤝";
+        gameStatusEl.style.color = "#6c757d";
+      } else if (winner === playerSymbol) {
+        message = `You win! 🎉 (vs ${difficulty.toUpperCase()} AI)`;
+        gameStatusEl.style.color = "#28a745";
+      } else {
+        message = `AI wins 🤖 (${difficulty.toUpperCase()} difficulty)`;
+        gameStatusEl.style.color = "#dc3545";
+      }
+
+      if (reason === 'timeout') {
+        if (winner === playerSymbol) {
+          message = `You win! 🎉 (AI ran out of time)`;
+          gameStatusEl.style.color = "#28a745";
+        } else {
+          message = `You lose 😢 (Time ran out)`;
+          gameStatusEl.style.color = "#dc3545";
         }
       }
 
-      function updateTimers() {
-        const ids = Object.keys(baseTimers);
-        if (ids.length >= 2) {
-          const pidX = ids[0],
-            pidO = ids[1];
-          currentTurnPlayerId = currentTurn === "X" ? pidX : pidO;
-          xTimerEl.textContent = formatTime(baseTimers[pidX] ?? 60000);
-          oTimerEl.textContent = formatTime(baseTimers[pidO] ?? 60000);
-        } else {
-          xTimerEl.textContent = oTimerEl.textContent = "1:00";
+      gameStatusEl.textContent = message;
+      turnEl.textContent = "Game finished";
+      
+      showNewGameButtons();
+    });
+
+    socket.on('errorMessage', (msg) => {
+      console.error('Error:', msg);
+      gameStatusEl.textContent = `Error: ${msg}`;
+      gameStatusEl.style.color = "#dc3545";
+      hideAIThinking();
+    });
+
+    // Click handler for making moves
+    boardEl.addEventListener('click', (e) => {
+      if (!gameActive || currentTurn !== playerSymbol) return;
+
+      const cell = e.target;
+      if (!cell.classList.contains('cell') || cell.classList.contains('taken')) return;
+
+      const index = parseInt(cell.dataset.index);
+      if (isNaN(index)) return;
+
+      console.log('Making AI move at index:', index);
+      socket.emit('makeAIMove', { gameId, index });
+
+      // Provide immediate feedback
+      cell.style.background = '#e9ecef';
+      setTimeout(() => {
+        if (!cell.classList.contains('taken')) {
+          cell.style.background = 'white';
+        }
+      }, 200);
+    });
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      if (!gameActive || currentTurn !== playerSymbol) return;
+
+      const key = e.key;
+      let index = -1;
+
+      if (key >= '1' && key <= '9') {
+        index = parseInt(key) - 1;
+      } else if (key >= '0' && key <= '8') {
+        index = parseInt(key);
+      }
+
+      if (index >= 0 && index <= 8) {
+        const cell = boardEl.children[index];
+        if (cell && !cell.classList.contains('taken')) {
+          cell.click();
         }
       }
+    });
 
-      function startCountdown() {
-        clearInterval(localTimerInterval);
-        if (
-          !currentTurnPlayerId ||
-          !turnStartTime ||
-          !baseTimers[currentTurnPlayerId]
-        )
-          return;
-        const activeId = currentTurnPlayerId;
-        const tick = () => {
-          const elapsed = Date.now() - turnStartTime;
-          const remaining = Math.max(0, baseTimers[activeId] - elapsed);
-          if (currentTurn === playerSymbol) {
-            xTimerEl.textContent = formatTime(remaining);
-            xTimerContainer.classList.add("active");
-            oTimerContainer.classList.remove("active", "ai-active");
-          } else {
-            oTimerEl.textContent = formatTime(remaining);
-            oTimerContainer.classList.add("active", "ai-active");
-            xTimerContainer.classList.remove("active");
-          }
-          if (remaining <= 0) clearInterval(localTimerInterval);
-        };
-        tick();
-        localTimerInterval = setInterval(tick, 100);
-      }
-
-      function stopCountdown() {
-        clearInterval(localTimerInterval);
-        xTimerContainer.classList.remove("active", "ai-active");
-        oTimerContainer.classList.remove("active", "ai-active");
-      }
-
-      socket.on("connect", () => {
-        connectionStatusEl.textContent = "Connected";
-        gameStatusEl.textContent = "Connected! Joining AI game...";
-        socket.emit("joinAIGame", { gameId, playerId });
-      });
-      socket.on("disconnect", () => {
-        connectionStatusEl.textContent = "Disconnected";
-        gameStatusEl.textContent = "Disconnected from server";
-        stopCountdown();
-        hideAIStatus();
-      });
-
-      socket.on("matchFound", ({ symbol, opponentName }) => {
-        playerSymbol = symbol;
-        symbolEl.textContent = `You are ${symbol}`;
-        gameStatusEl.textContent = "AI game started!";
-        opponentInfoEl.style.display = "block";
-        opponentNameEl.textContent = opponentName;
-        difficultyBadgeEl.textContent =
-          difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-        difficultyBadgeEl.className = `difficulty-badge difficulty-${difficulty}`;
-      });
-
-      socket.on("boardUpdate", ({ board, turn, timers, turnStartTime: ts }) => {
-        updateBoard(board);
-        currentTurn = turn;
-        if (timers) baseTimers = { ...timers };
-        if (ts) turnStartTime = ts;
-        updateTimers();
-        stopCountdown();
-        startCountdown();
-        updateTurnIndicator();
-        if (currentTurn === playerSymbol) hideAIStatus();
-      });
-
-      socket.on("aiThinking", ({ message }) => {
-        showAIStatus(message, "thinking");
-      });
-      socket.on("aiMoveComplete", ({ message }) => {
-        showAIStatus(message, "complete");
-      });
-
-      socket.on("gameOver", ({ winner, reason }) => {
-        gameActive = false;
-        stopCountdown();
-        hideAIStatus();
-        let msg = "";
-        if (winner === "draw") msg = "Draw!";
-        else if (winner === playerSymbol) msg = `You win! (${difficulty})`;
-        else msg = `AI wins! (${difficulty})`;
-        if (reason === "timeout") msg += " (Time ran out)";
-        gameStatusEl.textContent = msg;
-        turnEl.textContent = "Game finished";
-        newAIGameButton.style.display = "inline-block";
-        queueNewGameButton.style.display = "inline-block";
-        newGameButton.style.display = "inline-block";
-      });
-
-      boardEl.addEventListener("click", (e) => {
-        if (!gameActive || currentTurn !== playerSymbol) return;
-        const cell = e.target;
-        if (
-          !cell.classList.contains("cell") ||
-          cell.classList.contains("taken")
-        )
-          return;
-        const index = parseInt(cell.dataset.index);
-        socket.emit("makeAIMove", { gameId, index });
-      });
-
-      window.addEventListener("beforeunload", () => {
-        stopCountdown();
-        hideAIStatus();
-      });
-    </script>
-  </body>
+    // Cleanup on unload
+    window.addEventListener('beforeunload', () => {
+      stopLocalCountdown();
+      hideAIThinking();
+    });
+  </script>
+</body>
 </html>
