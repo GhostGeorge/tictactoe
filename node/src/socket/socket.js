@@ -299,6 +299,16 @@ module.exports = function(io) {
       global.aiGames = global.aiGames || new Map();
       const aiGameData = global.aiGames.get(gameId);
       
+      console.log(`AI game lookup: gameId=${gameId}, found=${!!aiGameData}, total AI games=${global.aiGames.size}`);
+      if (aiGameData) {
+        console.log(`AI game data:`, {
+          difficulty: aiGameData.difficulty,
+          humanPlayerId: aiGameData.humanPlayerId,
+          gameStatus: aiGameData.game.state.status,
+          gameTurn: aiGameData.game.state.turn
+        });
+      }
+      
       if (!aiGameData) {
         io.to(socket.id).emit('errorMessage', 'AI Game not found');
         return;
@@ -693,15 +703,18 @@ module.exports = function(io) {
 
     function convertPlayerIdToSymbol(game, playerId) {
       if (!playerId) return null;
+      // If playerId is already a symbol (X or O), return it
+      if (playerId === 'X' || playerId === 'O') {
+        return playerId;
+      }
+      // Otherwise, convert player ID to symbol
       const playerIndex = game.players.findIndex(p => p.playerId === playerId);
       return playerIndex === 0 ? 'X' : 'O';
     }
 
     function convertBoardToSymbols(game) {
-      return game.state.board.map(cell => {
-        if (!cell) return null;
-        return convertPlayerIdToSymbol(game, cell);
-      });
+      // Board now stores symbols directly, so just return it as is
+      return game.state.board;
     }
 
     // Convert string playerId to number for database logging

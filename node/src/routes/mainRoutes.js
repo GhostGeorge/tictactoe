@@ -170,14 +170,22 @@ router.get('/game/:gameId', ensureGuestOrLoggedIn, (req, res) => {
 
 // AI game selection page
 router.get('/play-ai', ensureGuestOrLoggedIn, (req, res) => {
-  res.render('playAI');
+  res.render('aiselection', { query: req.query });
 });
 
 // Handle AI game creation
 router.post('/play-ai', ensureGuestOrLoggedIn, async (req, res) => {
+  console.log('POST /play-ai received:', { 
+    body: req.body, 
+    difficulty: req.body.difficulty,
+    headers: req.headers['content-type'],
+    method: req.method
+  });
+  
   const { difficulty } = req.body;
   
   if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+    console.log(`Invalid difficulty received: "${difficulty}"`);
     return res.redirect('/play-ai?error=invalid_difficulty');
   }
 
@@ -216,6 +224,15 @@ router.post('/play-ai', ensureGuestOrLoggedIn, async (req, res) => {
     game.isRated = false;
     game.hasGuest = true; // This will prevent rating updates
     
+    console.log(`Game created with ID: ${gameId}`);
+    console.log(`Game object:`, {
+      id: game.id,
+      players: game.players.map(p => ({ id: p.playerId, name: p.displayName })),
+      status: game.state.status,
+      turn: game.state.turn,
+      board: game.state.board
+    });
+    
     // Store AI player instance and game info in memory (you might want to use Redis in production)
     global.aiGames = global.aiGames || new Map();
     global.aiGames.set(gameId, {
@@ -226,6 +243,15 @@ router.post('/play-ai', ensureGuestOrLoggedIn, async (req, res) => {
     });
 
     console.log(`Created AI game ${gameId} - Human: ${humanPlayerName} (${humanPlayerId}), Difficulty: ${difficulty}, Human goes first: ${humanGoesFirst}`);
+    console.log(`AI game stored in global.aiGames. Total AI games: ${global.aiGames.size}`);
+    console.log(`AI game data:`, {
+      gameId,
+      difficulty,
+      humanPlayerId,
+      aiPlayerId: aiPlayer.playerId,
+      gameStatus: game.state.status,
+      gameTurn: game.state.turn
+    });
 
     // Store game info in session
     req.session.currentAIGameId = gameId;
@@ -233,6 +259,9 @@ router.post('/play-ai', ensureGuestOrLoggedIn, async (req, res) => {
     req.session.playerName = humanPlayerName;
 
     // Redirect to AI game page
+    console.log(`Redirecting to AI game page. Final AI games count: ${global.aiGames.size}`);
+    console.log(`Available AI games:`, Array.from(global.aiGames.keys()));
+    
     res.redirect(`/game-ai/${gameId}?playerId=${encodeURIComponent(humanPlayerId)}`);
 
   } catch (error) {

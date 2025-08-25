@@ -196,11 +196,11 @@
     </div>
 
     <!-- Error message if any -->
-    <% if (typeof query !== 'undefined' && query.error) { %>
+    <% if (typeof locals.query !== 'undefined' && locals.query && locals.query.error) { %>
       <div class="error-message">
-        <% if (query.error === 'invalid_difficulty') { %>
+        <% if (locals.query.error === 'invalid_difficulty') { %>
           Please select a valid difficulty level.
-        <% } else if (query.error === 'creation_failed') { %>
+        <% } else if (locals.query.error === 'creation_failed') { %>
           Failed to create AI game. Please try again.
         <% } else { %>
           An error occurred. Please try again.
@@ -290,6 +290,17 @@
 
     // Form submission handler
     document.querySelector('form').addEventListener('submit', (e) => {
+      const selectedDifficulty = document.querySelector('input[name="difficulty"]:checked');
+      
+      if (!selectedDifficulty) {
+        e.preventDefault();
+        alert('Please select a difficulty level before starting the game.');
+        return;
+      }
+      
+      console.log('Submitting form with difficulty:', selectedDifficulty.value);
+      console.log('Form data:', new FormData(e.target));
+      
       startGameBtn.disabled = true;
       startGameBtn.textContent = 'Creating AI Game...';
     });

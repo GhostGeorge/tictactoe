@@ -2,367 +2,145 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>AI Tic Tac Toe Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Game - Tic Tac Toe</title>
+  <link rel="stylesheet" href="/styles/index.css">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }
-    
-    #board {
-      display: grid;
-      grid-template-columns: repeat(3, 100px);
-      grid-gap: 2px;
-      margin: 20px auto;
-      width: 304px;
-      background: #333;
-      border-radius: 8px;
-      padding: 2px;
-    }
-    
-    .cell {
-      width: 100px;
-      height: 100px;
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-      font-weight: bold;
-      cursor: pointer;
-      user-select: none;
-      border-radius: 4px;
-      transition: all 0.2s;
-    }
-    
-    .cell:hover:not(.taken) {
-      background: #f0f0f0;
-      transform: scale(1.05);
-    }
-    
-    .cell.taken {
-      cursor: not-allowed;
-      background: #f8f9fa;
-    }
-    
-    .cell.winning {
-      background: #d4edda !important;
-      color: #155724;
-      animation: winning-pulse 0.5s ease-in-out;
-    }
-    
-    @keyframes winning-pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-    
-    #gameStatus {
-      font-size: 1rem;
+    .ai-status {
+      display: none;
       margin: 10px 0;
-      font-weight: bold;
-      min-height: 2rem;
-    }
-    
-    #playerSymbol {
-      font-size: 1.2rem;
-      margin: 10px 0;
-      background: #e9ecef;
       padding: 10px;
       border-radius: 5px;
-      display: inline-block;
+      font-weight: bold;
     }
     
-    #turnIndicator {
-      font-size: 1.1rem;
-      margin: 10px 0;
-      color: #666;
-      min-height: 1.5rem;
-    }
-
-    /* AI-specific styles */
-    .ai-status {
-      background: #e7f3ff;
-      border: 1px solid #b3d9ff;
-      border-radius: 8px;
-      padding: 15px;
-      margin: 15px auto;
-      max-width: 400px;
-      font-size: 0.95rem;
-    }
-
     .ai-thinking {
       background: #fff3cd;
-      border-color: #ffeaa7;
       color: #856404;
-      animation: thinking-pulse 1.5s ease-in-out infinite;
+      border: 1px solid #ffeaa7;
     }
-
-    @keyframes thinking-pulse {
-      0%, 100% { opacity: 0.8; }
-      50% { opacity: 1; }
+    
+    .ai-complete {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
     }
-
-    .ai-move-complete {
-      background: #d1ecf1;
-      border-color: #bee5eb;
-      color: #0c5460;
-    }
-
+    
     .difficulty-badge {
       display: inline-block;
-      padding: 4px 12px;
+      padding: 4px 8px;
       border-radius: 12px;
       font-size: 0.8rem;
       font-weight: bold;
       margin-left: 10px;
     }
-
-    .difficulty-easy { background: #d4edda; color: #155724; }
-    .difficulty-medium { background: #fff3cd; color: #856404; }
-    .difficulty-hard { background: #f8d7da; color: #721c24; }
-
-    .opponent-info {
-      background: #f8f9fa;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      padding: 15px;
-      margin: 15px auto;
-      max-width: 400px;
-      font-size: 1rem;
-    }
-
-    .opponent-name {
-      font-weight: bold;
-      color: #495057;
-      margin-bottom: 5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    .timer-container {
-      display: flex;
-      justify-content: space-around;
-      margin: 20px 0;
-      font-size: 1rem;
-      max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .timer {
-      padding: 15px;
-      border: 2px solid #ccc;
-      border-radius: 8px;
-      min-width: 120px;
-      background: white;
-      transition: all 0.3s ease;
-    }
-
-    .timer.active {
-      border-color: #007bff;
-      background-color: #e7f3ff;
-      transform: scale(1.05);
-    }
-
-    .timer.ai-active {
-      border-color: #28a745;
-      background-color: #d4edda;
-    }
-
-    .timer.warning {
-      border-color: #dc3545;
-      background-color: #f8d7da;
-      color: #721c24;
-      animation: pulse 1s infinite;
-    }
-
-    .timer-label {
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-
-    .timer-value {
-      font-size: 1.2rem;
-      font-family: monospace;
-    }
-
-    .connection-status {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      padding: 5px 10px;
-      border-radius: 15px;
-      font-size: 0.8rem;
-      font-weight: bold;
-    }
-
-    .connected {
+    
+    .difficulty-easy {
       background: #d4edda;
       color: #155724;
     }
-
-    .disconnected {
+    
+    .difficulty-medium {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .difficulty-hard {
       background: #f8d7da;
       color: #721c24;
     }
-
-    .game-info {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      margin: 20px auto;
-      max-width: 500px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    button {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1rem;
-      margin: 5px;
-      transition: all 0.2s;
-    }
-
-    button:hover {
-      background: #0056b3;
-      transform: translateY(-1px);
-    }
-
-    button:disabled {
-      background: #6c757d;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    button.queue-button {
-      background: #28a745;
-      font-weight: bold;
-    }
-
-    button.queue-button:hover {
-      background: #218838;
-    }
-
-    button.ai-button {
-      background: #6f42c1;
-    }
-
-    button.ai-button:hover {
-      background: #5a32a3;
-    }
-
-    .button-container {
-      margin-top: 20px;
-    }
-
-    .thinking-dots {
-      display: inline-block;
-    }
-
-    .thinking-dots::after {
-      content: '';
-      animation: thinking-dots 1.5s steps(4, end) infinite;
-    }
-
-    @keyframes thinking-dots {
-      0%, 20% { content: ''; }
-      40% { content: '.'; }
-      60% { content: '..'; }
-      80%, 100% { content: '...'; }
-    }
-
-    .ai-icon {
-      font-size: 1.2rem;
-      margin-right: 5px;
+    
+    .ai-active {
+      background: #e7f3ff !important;
+      border-color: #007bff !important;
     }
   </style>
 </head>
 <body>
-  <div class="connection-status" id="connectionStatus">Connecting...</div>
-  
-  <div class="game-info">
-    <div id="gameStatus">Connecting to AI game...</div>
-    <div id="playerSymbol">Waiting for symbol assignment...</div>
-    
-    <!-- AI opponent info -->
-    <div id="opponentInfo" class="opponent-info" style="display: none;">
-      <div class="opponent-name">
-        <span class="ai-icon">🤖</span>
-        <span id="opponentName">Loading...</span>
-        <span id="difficultyBadge" class="difficulty-badge">Loading...</span>
-      </div>
-      <div class="opponent-status-text" id="opponentStatusText">AI Ready</div>
-    </div>
-    
-    <!-- AI status messages -->
-    <div id="aiStatus" class="ai-status" style="display: none;"></div>
-    
-    <div id="turnIndicator">Waiting for game to start...</div>
-  </div>
-  
-  <div class="timer-container">
-    <div class="timer" id="playerXTimer">
-      <div class="timer-label" id="xLabel">Player X</div>
-      <div class="timer-value" id="xTimeRemaining">1:00</div>
-    </div>
-    <div class="timer" id="playerOTimer">
-      <div class="timer-label" id="oLabel">Player O</div>
-      <div class="timer-value" id="oTimeRemaining">1:00</div>
-    </div>
-  </div>
-  
-  <div id="board">
-    <div class="cell" data-index="0"></div>
-    <div class="cell" data-index="1"></div>
-    <div class="cell" data-index="2"></div>
-    <div class="cell" data-index="3"></div>
-    <div class="cell" data-index="4"></div>
-    <div class="cell" data-index="5"></div>
-    <div class="cell" data-index="6"></div>
-    <div class="cell" data-index="7"></div>
-    <div class="cell" data-index="8"></div>
-  </div>
-
-  <div class="button-container">
-    <button onclick="window.location.href='/home'">Return Home</button>
-    <button id="newAIGameButton" class="ai-button" style="display: none;" onclick="window.location.href='/play-ai'">Play AI Again</button>
-    <button id="newGameButton" class="queue-button" style="display: none;" onclick="window.location.href='/queue'">Queue vs Humans</button>
-  </div>
-
+  <!-- Server data for JavaScript -->
   <script id="server-data" type="application/json">
-    <%- JSON.stringify({ gameId, playerId, difficulty, aiName, guest }) %>
+    {
+      "gameId": "<%= gameId %>",
+      "playerId": "<%= playerId %>",
+      "difficulty": "<%= difficulty %>",
+      "aiName": "<%= aiName %>",
+      "guest": <%= guest %>
+    }
   </script>
+
+  <div class="container">
+    <div class="game-header">
+      <h1>AI Game</h1>
+      <div id="connectionStatus" class="connection-status">Connecting...</div>
+    </div>
+
+    <div class="game-info">
+      <div id="playerSymbol" class="player-symbol">Waiting...</div>
+      <div id="gameStatus" class="game-status">Connecting to AI game...</div>
+      <div id="turnIndicator" class="turn-indicator">Waiting for game to start...</div>
+    </div>
+
+    <div id="opponentInfo" class="opponent-info" style="display: none;">
+      <span id="opponentName"></span>
+      <span id="difficultyBadge" class="difficulty-badge"></span>
+    </div>
+
+    <div id="aiStatus" class="ai-status"></div>
+
+    <div class="game-board">
+      <div id="board" class="board">
+        <div class="cell" data-index="0"></div>
+        <div class="cell" data-index="1"></div>
+        <div class="cell" data-index="2"></div>
+        <div class="cell" data-index="3"></div>
+        <div class="cell" data-index="4"></div>
+        <div class="cell" data-index="5"></div>
+        <div class="cell" data-index="6"></div>
+        <div class="cell" data-index="7"></div>
+        <div class="cell" data-index="8"></div>
+      </div>
+    </div>
+
+    <div class="timer-section">
+      <div class="timer-container">
+        <div id="playerXTimer" class="player-timer">
+          <div class="timer-label">
+            <span id="xLabel">X</span>
+          </div>
+          <div id="xTimeRemaining" class="time-remaining">1:00</div>
+        </div>
+        <div id="playerOTimer" class="player-timer">
+          <div class="timer-label">
+            <span id="oLabel">O</span>
+          </div>
+          <div id="oTimeRemaining" class="time-remaining">1:00</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-actions" style="display: none;">
+      <button id="newAIGameButton" class="btn btn-primary" onclick="window.location.href='/play-ai'">New AI Game</button>
+      <button id="newGameButton" class="btn btn-secondary" onclick="window.location.href='/home'">Back to Home</button>
+    </div>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
+    // Initialize socket connection
     const socket = io();
 
     // Parse server data
     const serverData = JSON.parse(document.getElementById('server-data').textContent);
     const { gameId, playerId, difficulty, aiName, guest: isGuest } = serverData;
 
-    // Game state
+    // Game state - single declaration only
     let playerSymbol = null;
     let playerIndex = null;
     let currentTurn = null;
     let gameActive = true;
-    let timerInterval = null;
-    let opponentAIName = serverData.aiName || 'AI'; // Renamed to avoid conflict
-    let currentTurn = null;
-    let gameActive = true;
-    let timerInterval = null;
-    let aiName = serverData.aiName || 'AI';
+    let opponentAIName = aiName || 'AI';
 
-    // Timer state
+    // Timer state - consolidated timer management
     let baseTimers = {};
     let turnStartTime = null;
     let currentTurnPlayerId = null;
@@ -409,7 +187,7 @@
       aiStatusEl.className = `ai-status ai-${type}`;
       
       if (type === 'thinking') {
-        aiStatusEl.innerHTML = `🤖 <span class="thinking-dots">${message}</span>`;
+        aiStatusEl.innerHTML = `🤖 ${message}`;
       } else {
         aiStatusEl.innerHTML = `🎯 ${message}`;
       }
@@ -544,6 +322,7 @@
         console.log('AI Match found! You are:', symbol, 'Player index:', playerIndex, 'vs AI:', opponentName);
       }
       
+      // Update timer labels
       if (playerSymbol === 'X') {
         document.getElementById('xLabel').textContent = 'You';
         document.getElementById('oLabel').textContent = opponentAIName;

@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
     "colors": "^1.4.0",
     "connect-pg-simple": "^10.0.0",
     "dotenv": "^16.4.5",
@@ -18,7 +19,11 @@
     "express": "^4.19.2",
     "express-session": "^1.18.0",
     "openai": "^5.15.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.11.3",
     "serve-favicon": "^2.5.0",
-    "uid": "^2.0.2"
+    "uid": "^2.0.2",
+    "uuid": "^9.0.1"
   }
 }
